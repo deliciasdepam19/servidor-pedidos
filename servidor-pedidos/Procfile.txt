@@ -1,1 +1,0 @@
-web: java -jar target/servidor-pedidos-1.0.jar
