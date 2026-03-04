@@ -1,5 +1,7 @@
 package server;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -10,9 +12,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
 
 public class PedidosServer {
 
@@ -52,19 +51,13 @@ public class PedidosServer {
     public PedidosServer() throws IOException {
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
+        // Endpoint: POST /api/pedidos - Recibir nuevo pedido
         servidor.createContext("/api/pedidos", exchange -> {
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
-
-            if ("OPTIONS".equals(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(204, -1);
-                return;
-            }
-
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
                     String body = readBody(exchange);
+
+                    // Parsear manualmente el JSON (sin librería)
                     String cliente = extraerValor(body, "cliente");
                     String telefono = extraerValor(body, "telefono");
                     String detalle = extraerValor(body, "detalle");
@@ -73,11 +66,14 @@ public class PedidosServer {
                     int numeroPedido = historicoPedidos.size() + 1;
                     Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
                     historicoPedidos.add(pedido);
+                    StockDescontador.descontarDesdeDetalle(detalle);
 
+                    // Notificar a todos los listeners
                     for (PedidoListener listener : listeners) {
                         listener.onNuevoPedido(pedido);
                     }
 
+                    // Respuesta exitosa
                     String respuesta = "{\"exito\":true,\"mensaje\":\"Pedido recibido\",\"numero\":" + numeroPedido + "}";
                     enviarRespuesta(exchange, 200, respuesta);
 
