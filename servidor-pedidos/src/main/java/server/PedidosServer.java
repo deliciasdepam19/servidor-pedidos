@@ -53,11 +53,18 @@ public class PedidosServer {
 
         // Endpoint: POST /api/pedidos - Recibir nuevo pedido
         servidor.createContext("/api/pedidos", exchange -> {
+            agregarCorsHeaders(exchange);
+
+            // Manejo de preflight OPTIONS
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
                     String body = readBody(exchange);
 
-                    // Parsear manualmente el JSON (sin librería)
                     String cliente = extraerValor(body, "cliente");
                     String telefono = extraerValor(body, "telefono");
                     String detalle = extraerValor(body, "detalle");
@@ -68,12 +75,10 @@ public class PedidosServer {
                     historicoPedidos.add(pedido);
                     StockDescontador.descontarDesdeDetalle(detalle);
 
-                    // Notificar a todos los listeners
                     for (PedidoListener listener : listeners) {
                         listener.onNuevoPedido(pedido);
                     }
 
-                    // Respuesta exitosa
                     String respuesta = "{\"exito\":true,\"mensaje\":\"Pedido recibido\",\"numero\":" + numeroPedido + "}";
                     enviarRespuesta(exchange, 200, respuesta);
 
@@ -89,6 +94,13 @@ public class PedidosServer {
 
         // Endpoint: GET /api/pedidos/historico - Obtener histórico
         servidor.createContext("/api/pedidos/historico", exchange -> {
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
             if ("GET".equals(exchange.getRequestMethod())) {
                 StringBuilder json = new StringBuilder("[");
                 for (int i = 0; i < historicoPedidos.size(); i++) {
@@ -112,8 +124,59 @@ public class PedidosServer {
             }
         });
 
+        // Endpoint: DELETE /api/pedidos/eliminar - Eliminar pedido por número
+        servidor.createContext("/api/pedidos/eliminar", exchange -> {
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if ("DELETE".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    int numero = (int) extraerDouble(body, "numero");
+
+                    boolean eliminado = historicoPedidos.removeIf(p -> p.numero == numero);
+
+                    if (eliminado) {
+                        System.out.println("🗑️  Pedido #" + numero + " eliminado del servidor.");
+                        enviarRespuesta(exchange, 200, "{\"exito\":true,\"mensaje\":\"Pedido eliminado\",\"numero\":" + numero + "}");
+                    } else {
+                        enviarRespuesta(exchange, 404, "{\"exito\":false,\"error\":\"Pedido no encontrado\"}");
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"" + e.getMessage() + "\"}");
+                }
+            } else {
+                enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
+            }
+        });
+
+        // Endpoint: DELETE /api/pedidos/limpiar - Eliminar TODOS los pedidos
+        servidor.createContext("/api/pedidos/limpiar", exchange -> {
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if ("DELETE".equals(exchange.getRequestMethod())) {
+                int cantidad = historicoPedidos.size();
+                historicoPedidos.clear();
+                System.out.println("🧹 Se eliminaron " + cantidad + " pedidos del servidor.");
+                enviarRespuesta(exchange, 200, "{\"exito\":true,\"mensaje\":\"Todos los pedidos eliminados\",\"cantidad\":" + cantidad + "}");
+            } else {
+                enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
+            }
+        });
+
         // Endpoint: GET / - Health check
         servidor.createContext("/", exchange -> {
+            agregarCorsHeaders(exchange);
             String response = "{\"status\":\"ok\",\"puerto\":" + PUERTO + "}";
             enviarRespuesta(exchange, 200, response);
         });
@@ -156,13 +219,11 @@ public class PedidosServer {
         if (inicio == -1) {
             return "-";
         }
-
         inicio += patron.length();
         int fin = json.indexOf("\"", inicio);
         if (fin == -1) {
             return "-";
         }
-
         return json.substring(inicio, fin);
     }
 
@@ -172,7 +233,6 @@ public class PedidosServer {
         if (inicio == -1) {
             return 0.0;
         }
-
         inicio += patron.length();
         int fin = json.indexOf(",", inicio);
         if (fin == -1) {
@@ -181,7 +241,6 @@ public class PedidosServer {
         if (fin == -1) {
             return 0.0;
         }
-
         try {
             return Double.parseDouble(json.substring(inicio, fin).trim());
         } catch (Exception e) {
@@ -198,12 +257,15 @@ public class PedidosServer {
                 .replace("\r", "\\r");
     }
 
+    private void agregarCorsHeaders(HttpExchange exchange) {
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+    }
+
     private void enviarRespuesta(HttpExchange exchange, int codigo, String respuesta) throws IOException {
         byte[] bytes = respuesta.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
         exchange.sendResponseHeaders(codigo, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);
