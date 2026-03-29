@@ -1,5 +1,8 @@
 package server;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import dao.VentaDAO;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -11,10 +14,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
-
 public class PedidosServer {
+
+    private final VentaDAO ventaDAO = new VentaDAO();
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT"))
@@ -56,7 +58,6 @@ public class PedidosServer {
         servidor.createContext("/api/pedidos", exchange -> {
             agregarCorsHeaders(exchange);
 
-            // Manejo de preflight OPTIONS
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
@@ -71,9 +72,20 @@ public class PedidosServer {
                     String detalle = extraerValor(body, "detalle");
                     double total = extraerDouble(body, "total");
 
+                    String tipoPago = extraerValor(body, "tipoPago");
+                    if ("-".equals(tipoPago) || tipoPago.isBlank()) {
+                        tipoPago = "EFECTIVO";
+                    }
+
                     int numeroPedido = historicoPedidos.size() + 1;
                     Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
                     historicoPedidos.add(pedido);
+
+                    // Descontar stock si corresponde (empanadas, sopaipillas, churros)
+                    StockDescontador.descontarDesdeDetalle(detalle);
+
+                    // ✅ Registrar venta en VentaDAO para que aparezca en el resumen del día
+                    registrarVentaDesdeWeb(detalle, total, tipoPago, cliente);
 
                     for (PedidoListener listener : listeners) {
                         listener.onNuevoPedido(pedido);
@@ -183,6 +195,104 @@ public class PedidosServer {
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("🚀 Servidor de Pedidos iniciado en puerto " + PUERTO);
+    }
+
+    // ── Registrar venta en VentaDAO desde pedido web ──────────────────────────
+    private void registrarVentaDesdeWeb(String detalle, double totalPedido,
+            String tipoPago, String cliente) {
+        if (detalle == null || detalle.isBlank()) {
+            return;
+        }
+
+        // Cargar todos los productos de la BD una sola vez para buscar precios
+        dao.ProductoDAO productoDAO = new dao.ProductoDAO();
+        java.util.List<model.Producto> todosProductos = new java.util.ArrayList<>();
+        for (String cat : new String[]{"empanadas", "sopaipillas", "churros", "rapidos"}) {
+            todosProductos.addAll(productoDAO.listarPorCategoria(cat));
+        }
+
+        String[] items = detalle.split("\\+");
+        boolean registroIndividual = false;
+
+        for (String item : items) {
+            item = item.trim();
+            if (!item.matches("\\d+x .+")) {
+                continue;
+            }
+
+            int xIdx = item.indexOf('x');
+            int cantidad;
+            try {
+                cantidad = Integer.parseInt(item.substring(0, xIdx).trim());
+            } catch (NumberFormatException e) {
+                continue;
+            }
+
+            String nombreWeb = item.substring(xIdx + 1).trim();
+
+            // Normalizar: quitar prefijos de categoría que agrega la web
+            // Ej: "Panadería Pan amasado" → "Pan amasado"
+            String nombreNorm = normalizarNombreWeb(nombreWeb);
+
+            // Buscar precio real en BD
+            double precioUnitario = buscarPrecioEnBD(todosProductos, nombreWeb, nombreNorm);
+
+            // Si no se encontró en BD, usar totalPedido como fallback
+            if (precioUnitario == 0 && totalPedido > 0) {
+                precioUnitario = totalPedido / cantidad;
+                System.out.println("⚠️ Precio no encontrado en BD para [" + nombreWeb
+                        + "], usando total/cantidad: $" + precioUnitario);
+            }
+
+            // Registrar con el nombre normalizado (sin prefijo de categoría)
+            ventaDAO.registrarVentaRapida(nombreNorm, cantidad, precioUnitario, tipoPago);
+            registroIndividual = true;
+
+            System.out.println("✅ Venta web registrada: " + cantidad + "x "
+                    + nombreNorm + " | $" + (precioUnitario * cantidad) + " | " + tipoPago);
+        }
+
+        if (!registroIndividual && totalPedido > 0) {
+            ventaDAO.registrarVentaRapida(
+                    "Pedido Web (" + detalle + ")", 1, totalPedido, tipoPago);
+            System.out.println("✅ Venta web registrada (fallback): " + detalle + " | $" + totalPedido);
+        }
+    }
+
+    /**
+     * Quita prefijos de categoría que la web antepone al nombre del producto.
+     * Ej: "Panadería Pan amasado" → "Pan amasado" "Empanadas Carne pino" →
+     * "Empanada Carne pino"
+     */
+    private String normalizarNombreWeb(String nombre) {
+        if (nombre == null) {
+            return "";
+        }
+        String[] prefijos = {"Panadería ", "Panaderia ", "Empanadas ", "Sopaipillas ", "Churros ", "Rápidos ", "Rapidos "};
+        for (String pref : prefijos) {
+            if (nombre.startsWith(pref)) {
+                return nombre.substring(pref.length()).trim();
+            }
+        }
+        return nombre;
+    }
+
+    /**
+     * Busca el precio unitario del producto en la lista cargada desde BD.
+     * Intenta primero con el nombre original (web) y luego con el normalizado.
+     */
+    private double buscarPrecioEnBD(java.util.List<model.Producto> productos,
+            String nombreWeb, String nombreNorm) {
+        for (model.Producto p : productos) {
+            if (p.getNombre().equalsIgnoreCase(nombreWeb)
+                    || p.getNombre().equalsIgnoreCase(nombreNorm)) {
+                System.out.println("✅ Precio encontrado en BD: [" + p.getNombre()
+                        + "] = $" + p.getPrecio());
+                return p.getPrecio();
+            }
+        }
+        System.out.println("⚠️ Precio no encontrado en BD para: [" + nombreWeb + "] / [" + nombreNorm + "]");
+        return 0;
     }
 
     public void iniciar() {
