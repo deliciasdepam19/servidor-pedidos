@@ -67,15 +67,17 @@ public class PedidosServer {
                 try {
                     String body = readBody(exchange);
 
-                    String cliente  = extraerValor(body, "cliente");
+                    String cliente = extraerValor(body, "cliente");
                     String telefono = extraerValor(body, "telefono");
-                    String detalle  = extraerValor(body, "detalle");
-                    double total    = extraerDouble(body, "total");
+                    String detalle = extraerValor(body, "detalle");
+                    double total = extraerDouble(body, "total");
 
                     String tipoPago = extraerValor(body, "tipoPago");
                     if ("-".equals(tipoPago) || tipoPago.isBlank()) {
                         tipoPago = "EFECTIVO";
                     }
+
+                    System.out.println("🧪 TEST body: " + body);
 
                     int numeroPedido = historicoPedidos.size() + 1;
                     Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
@@ -261,11 +263,13 @@ public class PedidosServer {
 
     /**
      * Quita prefijos de categoría que la web antepone al nombre del producto.
-     * Ej: "Panadería Pan amasado" → "Pan amasado"
-     *     "Empanadas Carne pino"  → "Empanada Carne pino"
+     * Ej: "Panadería Pan amasado" → "Pan amasado" "Empanadas Carne pino" →
+     * "Empanada Carne pino"
      */
     private String normalizarNombreWeb(String nombre) {
-        if (nombre == null) return "";
+        if (nombre == null) {
+            return "";
+        }
         String[] prefijos = {"Panadería ", "Panaderia ", "Empanadas ", "Sopaipillas ", "Churros ", "Rápidos ", "Rapidos "};
         for (String pref : prefijos) {
             if (nombre.startsWith(pref)) {
@@ -276,9 +280,9 @@ public class PedidosServer {
     }
 
     /**
-     * Busca el precio unitario del producto.
-     * 1° busca en empanadas/sopaipillas/churros (productos con stock).
-     * 2° si no encuentra, busca el último precio registrado en ventas_rapidas.
+     * Busca el precio unitario del producto. 1° busca en
+     * empanadas/sopaipillas/churros (productos con stock). 2° si no encuentra,
+     * busca el último precio registrado en ventas_rapidas.
      */
     private double buscarPrecioEnBD(java.util.List<model.Producto> productos,
             String nombreWeb, String nombreNorm) {
@@ -292,21 +296,23 @@ public class PedidosServer {
         }
         // Buscar último precio en ventas_rapidas
         double precio = buscarUltimoPrecioRapido(nombreWeb, nombreNorm);
-        if (precio > 0) return precio;
+        if (precio > 0) {
+            return precio;
+        }
 
         System.out.println("⚠️ Precio no encontrado para: [" + nombreWeb + "] / [" + nombreNorm + "]");
         return 0;
     }
 
     /**
-     * Busca el precio_unitario más reciente en ventas_rapidas para ese producto.
+     * Busca el precio_unitario más reciente en ventas_rapidas para ese
+     * producto.
      */
     private double buscarUltimoPrecioRapido(String nombreWeb, String nombreNorm) {
         String sql = "SELECT precio_unitario FROM ventas_rapidas "
-                   + "WHERE LOWER(nombre) = LOWER(?) OR LOWER(nombre) = LOWER(?) "
-                   + "ORDER BY id DESC LIMIT 1";
-        try (java.sql.Connection conn = dao.Conexion.conectar();
-             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+                + "WHERE LOWER(nombre) = LOWER(?) OR LOWER(nombre) = LOWER(?) "
+                + "ORDER BY id DESC LIMIT 1";
+        try (java.sql.Connection conn = dao.Conexion.conectar(); java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, nombreWeb);
             ps.setString(2, nombreNorm);
             java.sql.ResultSet rs = ps.executeQuery();
