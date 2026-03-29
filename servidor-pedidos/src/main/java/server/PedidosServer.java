@@ -1,7 +1,5 @@
 package server;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -12,6 +10,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 
 public class PedidosServer {
 
@@ -73,7 +74,6 @@ public class PedidosServer {
                     int numeroPedido = historicoPedidos.size() + 1;
                     Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
                     historicoPedidos.add(pedido);
-                    StockDescontador.descontarDesdeDetalle(detalle);
 
                     for (PedidoListener listener : listeners) {
                         listener.onNuevoPedido(pedido);
