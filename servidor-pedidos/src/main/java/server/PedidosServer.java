@@ -54,7 +54,6 @@ public class PedidosServer {
     public PedidosServer() throws IOException {
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
-        // Endpoint: POST /api/pedidos - Recibir nuevo pedido
         servidor.createContext("/api/pedidos", exchange -> {
             agregarCorsHeaders(exchange);
 
@@ -77,16 +76,14 @@ public class PedidosServer {
                         tipoPago = "EFECTIVO";
                     }
 
-                    System.out.println("🧪 TEST body: " + body);
+                    System.out.println("TEST body: " + body);
 
                     int numeroPedido = historicoPedidos.size() + 1;
                     Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
                     historicoPedidos.add(pedido);
-
-                    // Descontar stock si corresponde (empanadas, sopaipillas, churros)
+                
                     StockDescontador.descontarDesdeDetalle(detalle);
 
-                    // ✅ Registrar venta en VentaDAO para que aparezca en el resumen del día
                     registrarVentaDesdeWeb(detalle, total, tipoPago, cliente);
 
                     for (PedidoListener listener : listeners) {
@@ -106,7 +103,6 @@ public class PedidosServer {
             }
         });
 
-        // Endpoint: GET /api/pedidos/historico - Obtener histórico
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
 
@@ -138,7 +134,6 @@ public class PedidosServer {
             }
         });
 
-        // Endpoint: DELETE /api/pedidos/eliminar - Eliminar pedido por número
         servidor.createContext("/api/pedidos/eliminar", exchange -> {
             agregarCorsHeaders(exchange);
 
@@ -155,7 +150,7 @@ public class PedidosServer {
                     boolean eliminado = historicoPedidos.removeIf(p -> p.numero == numero);
 
                     if (eliminado) {
-                        System.out.println("🗑️  Pedido #" + numero + " eliminado del servidor.");
+                        System.out.println("Pedido #" + numero + " eliminado del servidor.");
                         enviarRespuesta(exchange, 200, "{\"exito\":true,\"mensaje\":\"Pedido eliminado\",\"numero\":" + numero + "}");
                     } else {
                         enviarRespuesta(exchange, 404, "{\"exito\":false,\"error\":\"Pedido no encontrado\"}");
@@ -169,7 +164,6 @@ public class PedidosServer {
             }
         });
 
-        // Endpoint: DELETE /api/pedidos/limpiar - Eliminar TODOS los pedidos
         servidor.createContext("/api/pedidos/limpiar", exchange -> {
             agregarCorsHeaders(exchange);
 
@@ -181,14 +175,55 @@ public class PedidosServer {
             if ("DELETE".equals(exchange.getRequestMethod())) {
                 int cantidad = historicoPedidos.size();
                 historicoPedidos.clear();
-                System.out.println("🧹 Se eliminaron " + cantidad + " pedidos del servidor.");
+                System.out.println("Se eliminaron " + cantidad + " pedidos del servidor.");
                 enviarRespuesta(exchange, 200, "{\"exito\":true,\"mensaje\":\"Todos los pedidos eliminados\",\"cantidad\":" + cantidad + "}");
             } else {
                 enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
             }
         });
 
-        // Endpoint: GET / - Health check
+private Map<String, Integer> stockMemoria = new java.util.concurrent.ConcurrentHashMap<>();
+
+servidor.createContext("/api/stock/actualizar", exchange -> {
+    agregarCorsHeaders(exchange);
+    if ("OPTIONS".equals(exchange.getRequestMethod())) {
+        exchange.sendResponseHeaders(204, -1); return;
+    }
+    if ("POST".equals(exchange.getRequestMethod())) {
+        String body = readBody(exchange);
+        body = body.replace("{","").replace("}","").trim();
+        for (String par : body.split(",")) {
+            String[] kv = par.split(":");
+            if (kv.length == 2) {
+                String key = kv[0].trim().replace("\"","");
+                try { stockMemoria.put(key, Integer.parseInt(kv[1].trim())); }
+                catch (Exception ignored) {}
+            }
+        }
+        System.out.println("Stock actualizado: " + stockMemoria);
+        enviarRespuesta(exchange, 200, "{\"exito\":true}");
+    } else {
+        enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
+    }
+});
+
+servidor.createContext("/api/stock", exchange -> {
+    agregarCorsHeaders(exchange);
+    if ("OPTIONS".equals(exchange.getRequestMethod())) {
+        exchange.sendResponseHeaders(204, -1); return;
+    }
+    if ("GET".equals(exchange.getRequestMethod())) {
+        StringBuilder json = new StringBuilder("{");
+        stockMemoria.forEach((k,v) -> json.append("\"").append(k).append("\":").append(v).append(","));
+        if (json.charAt(json.length()-1) == ',') json.deleteCharAt(json.length()-1);
+        json.append("}");
+        enviarRespuesta(exchange, 200, json.toString());
+    } else {
+        enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
+    }
+});
+
+    
         servidor.createContext("/", exchange -> {
             agregarCorsHeaders(exchange);
             String response = "{\"status\":\"ok\",\"puerto\":" + PUERTO + "}";
@@ -199,14 +234,12 @@ public class PedidosServer {
         System.out.println("🚀 Servidor de Pedidos iniciado en puerto " + PUERTO);
     }
 
-    // ── Registrar venta en VentaDAO desde pedido web ──────────────────────────
     private void registrarVentaDesdeWeb(String detalle, double totalPedido,
             String tipoPago, String cliente) {
         if (detalle == null || detalle.isBlank()) {
             return;
         }
-
-        // Cargar todos los productos de la BD una sola vez para buscar precios
+        
         dao.ProductoDAO productoDAO = new dao.ProductoDAO();
         java.util.List<model.Producto> todosProductos = new java.util.ArrayList<>();
         for (String cat : new String[]{"empanadas", "sopaipillas", "churros", "rapidos"}) {
@@ -231,41 +264,30 @@ public class PedidosServer {
             }
 
             String nombreWeb = item.substring(xIdx + 1).trim();
-
-            // Normalizar: quitar prefijos de categoría que agrega la web
-            // Ej: "Panadería Pan amasado" → "Pan amasado"
             String nombreNorm = normalizarNombreWeb(nombreWeb);
 
-            // Buscar precio real en BD
             double precioUnitario = buscarPrecioEnBD(todosProductos, nombreWeb, nombreNorm);
 
-            // Si no se encontró en BD, usar totalPedido como fallback
             if (precioUnitario == 0 && totalPedido > 0) {
                 precioUnitario = totalPedido / cantidad;
                 System.out.println("⚠️ Precio no encontrado en BD para [" + nombreWeb
                         + "], usando total/cantidad: $" + precioUnitario);
             }
 
-            // Registrar con el nombre normalizado (sin prefijo de categoría)
             ventaDAO.registrarVentaRapida(nombreNorm, cantidad, precioUnitario, tipoPago);
             registroIndividual = true;
 
-            System.out.println("✅ Venta web registrada: " + cantidad + "x "
+            System.out.println("Venta web registrada: " + cantidad + "x "
                     + nombreNorm + " | $" + (precioUnitario * cantidad) + " | " + tipoPago);
         }
 
         if (!registroIndividual && totalPedido > 0) {
             ventaDAO.registrarVentaRapida(
                     "Pedido Web (" + detalle + ")", 1, totalPedido, tipoPago);
-            System.out.println("✅ Venta web registrada (fallback): " + detalle + " | $" + totalPedido);
+            System.out.println("Venta web registrada (fallback): " + detalle + " | $" + totalPedido);
         }
     }
 
-    /**
-     * Quita prefijos de categoría que la web antepone al nombre del producto.
-     * Ej: "Panadería Pan amasado" → "Pan amasado" "Empanadas Carne pino" →
-     * "Empanada Carne pino"
-     */
     private String normalizarNombreWeb(String nombre) {
         if (nombre == null) {
             return "";
@@ -279,14 +301,9 @@ public class PedidosServer {
         return nombre;
     }
 
-    /**
-     * Busca el precio unitario del producto. 1° busca en
-     * empanadas/sopaipillas/churros (productos con stock). 2° si no encuentra,
-     * busca el último precio registrado en ventas_rapidas.
-     */
     private double buscarPrecioEnBD(java.util.List<model.Producto> productos,
             String nombreWeb, String nombreNorm) {
-        // Buscar en productos con stock
+
         for (model.Producto p : productos) {
             if (p.getNombre().equalsIgnoreCase(nombreWeb)
                     || p.getNombre().equalsIgnoreCase(nombreNorm)) {
@@ -294,20 +311,15 @@ public class PedidosServer {
                 return p.getPrecio();
             }
         }
-        // Buscar último precio en ventas_rapidas
         double precio = buscarUltimoPrecioRapido(nombreWeb, nombreNorm);
         if (precio > 0) {
             return precio;
         }
 
-        System.out.println("⚠️ Precio no encontrado para: [" + nombreWeb + "] / [" + nombreNorm + "]");
+        System.out.println("Precio no encontrado para: [" + nombreWeb + "] / [" + nombreNorm + "]");
         return 0;
     }
 
-    /**
-     * Busca el precio_unitario más reciente en ventas_rapidas para ese
-     * producto.
-     */
     private double buscarUltimoPrecioRapido(String nombreWeb, String nombreNorm) {
         String sql = "SELECT precio_unitario FROM ventas_rapidas "
                 + "WHERE LOWER(nombre) = LOWER(?) OR LOWER(nombre) = LOWER(?) "
@@ -318,11 +330,11 @@ public class PedidosServer {
             java.sql.ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 double precio = rs.getDouble(1);
-                System.out.println("✅ Precio en ventas_rapidas: [" + nombreNorm + "] = $" + precio);
+                System.out.println("Precio en ventas_rapidas: [" + nombreNorm + "] = $" + precio);
                 return precio;
             }
         } catch (java.sql.SQLException e) {
-            System.err.println("❌ Error buscando precio en ventas_rapidas: " + e.getMessage());
+            System.err.println("Error buscando precio en ventas_rapidas: " + e.getMessage());
         }
         return 0;
     }
@@ -333,7 +345,7 @@ public class PedidosServer {
 
     public void detener() {
         servidor.stop(0);
-        System.out.println("⛔ Servidor detenido");
+        System.out.println("Servidor detenido");
     }
 
     public void registrarListener(PedidoListener listener) {
