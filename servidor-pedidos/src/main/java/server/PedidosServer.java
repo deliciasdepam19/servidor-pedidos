@@ -57,38 +57,51 @@ public class PedidosServer {
         // ── POST /api/pedidos ─────────────────────────────────────────────────
         servidor.createContext("/api/pedidos", exchange -> {
             agregarCorsHeaders(exchange);
+
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
+
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
-                    String body = readBody(exchange);
+                    String body     = readBody(exchange);
                     String cliente  = extraerValor(body, "cliente");
                     String telefono = extraerValor(body, "telefono");
                     String detalle  = extraerValor(body, "detalle");
                     double total    = extraerDouble(body, "total");
 
-                    // ── Validación de horario (hora Chile) ────────────────────
+                    // ── Hora real de Chile ────────────────────────────────────
                     LocalDateTime ahora = LocalDateTime.now(ZoneId.of("America/Santiago"));
                     int hora = ahora.getHour();
 
-                    boolean esPanaderia = detalle != null && (
-                            detalle.contains("Panadería ") || detalle.contains("Panaderia "));
+                    // ── Detección de panadería en todo el body ────────────────
+                    String bodyLower = body.toLowerCase();
+                    boolean esPanaderia =
+                            bodyLower.contains("panaderia") ||
+                            bodyLower.contains("panadería");
 
+                    System.out.println(">>> HORA SANTIAGO: " + hora
+                            + " | ES_PANADERIA: " + esPanaderia
+                            + " | DETALLE: " + detalle);
+
+                    // ── Validación de horario ─────────────────────────────────
                     boolean fueraHorario;
-                    String mensajeHorario;
+                    String  mensajeHorario;
 
-if (esPanaderia) {
-    fueraHorario = hora < 12 || hora >= 18;
-    mensajeHorario = "Los pedidos de Panadería se reciben entre las 12:00 y las 18:00 hrs.";
-} else {
-    fueraHorario = hora < 18 || hora >= 22;
-    mensajeHorario = "Los pedidos se reciben entre las 18:00 y las 22:00 hrs.";
-}
+                    if (esPanaderia) {
+                        // Panadería: solo de 12:00 a 18:00
+                        fueraHorario   = hora < 12 || hora >= 18;
+                        mensajeHorario = "Los pedidos de Panadería se reciben entre las 12:00 y las 18:00 hrs.";
+                    } else {
+                        // Resto: solo de 18:00 a 22:00
+                        fueraHorario   = hora < 18 || hora >= 22;
+                        mensajeHorario = "Los pedidos se reciben entre las 18:00 y las 22:00 hrs.";
+                    }
 
                     if (fueraHorario) {
-                        System.err.println("Pedido rechazado por horario (" + hora + ":xx) - esPanaderia=" + esPanaderia);
+                        System.err.println(">>> PEDIDO RECHAZADO horario ("
+                                + hora + ":xx) esPanaderia=" + esPanaderia);
                         enviarRespuesta(exchange, 403,
                                 "{\"exito\":false,\"error\":\"" + mensajeHorario + "\"}");
                         return;
@@ -107,12 +120,13 @@ if (esPanaderia) {
                         listener.onNuevoPedido(pedido);
                     }
 
-                    String respuesta = "{\"exito\":true,\"mensaje\":\"Pedido recibido\",\"numero\":" + numeroPedido + "}";
-                    enviarRespuesta(exchange, 200, respuesta);
+                    enviarRespuesta(exchange, 200,
+                            "{\"exito\":true,\"mensaje\":\"Pedido recibido\",\"numero\":" + numeroPedido + "}");
 
                 } catch (Exception e) {
                     e.printStackTrace();
-                    enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"" + e.getMessage() + "\"}");
+                    enviarRespuesta(exchange, 400,
+                            "{\"exito\":false,\"error\":\"" + e.getMessage() + "\"}");
                 }
             } else {
                 enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
@@ -122,22 +136,24 @@ if (esPanaderia) {
         // ── GET /api/pedidos/historico ────────────────────────────────────────
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
+
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
+
             if ("GET".equals(exchange.getRequestMethod())) {
                 StringBuilder json = new StringBuilder("[");
                 for (int i = 0; i < historicoPedidos.size(); i++) {
                     Pedido p = historicoPedidos.get(i);
                     json.append("{")
-                        .append("\"numero\":").append(p.numero).append(",")
-                        .append("\"cliente\":\"").append(escaparJson(p.cliente)).append("\",")
-                        .append("\"telefono\":\"").append(escaparJson(p.telefono)).append("\",")
-                        .append("\"detalle\":\"").append(escaparJson(p.detalle)).append("\",")
-                        .append("\"total\":").append(p.total).append(",")
-                        .append("\"timestamp\":\"").append(p.timestamp).append("\"")
-                        .append("}");
+                            .append("\"numero\":").append(p.numero).append(",")
+                            .append("\"cliente\":\"").append(escaparJson(p.cliente)).append("\",")
+                            .append("\"telefono\":\"").append(escaparJson(p.telefono)).append("\",")
+                            .append("\"detalle\":\"").append(escaparJson(p.detalle)).append("\",")
+                            .append("\"total\":").append(p.total).append(",")
+                            .append("\"timestamp\":\"").append(p.timestamp).append("\"")
+                            .append("}");
                     if (i < historicoPedidos.size() - 1) json.append(",");
                 }
                 json.append("]");
@@ -150,24 +166,29 @@ if (esPanaderia) {
         // ── DELETE /api/pedidos/eliminar ──────────────────────────────────────
         servidor.createContext("/api/pedidos/eliminar", exchange -> {
             agregarCorsHeaders(exchange);
+
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
+
             if ("DELETE".equals(exchange.getRequestMethod())) {
                 try {
                     String body = readBody(exchange);
-                    int numero = (int) extraerDouble(body, "numero");
+                    int numero  = (int) extraerDouble(body, "numero");
                     boolean eliminado = historicoPedidos.removeIf(p -> p.numero == numero);
                     if (eliminado) {
                         System.out.println("Pedido #" + numero + " eliminado.");
-                        enviarRespuesta(exchange, 200, "{\"exito\":true,\"numero\":" + numero + "}");
+                        enviarRespuesta(exchange, 200,
+                                "{\"exito\":true,\"numero\":" + numero + "}");
                     } else {
-                        enviarRespuesta(exchange, 404, "{\"exito\":false,\"error\":\"Pedido no encontrado\"}");
+                        enviarRespuesta(exchange, 404,
+                                "{\"exito\":false,\"error\":\"Pedido no encontrado\"}");
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
-                    enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"" + e.getMessage() + "\"}");
+                    enviarRespuesta(exchange, 400,
+                            "{\"exito\":false,\"error\":\"" + e.getMessage() + "\"}");
                 }
             } else {
                 enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
@@ -177,15 +198,18 @@ if (esPanaderia) {
         // ── DELETE /api/pedidos/limpiar ───────────────────────────────────────
         servidor.createContext("/api/pedidos/limpiar", exchange -> {
             agregarCorsHeaders(exchange);
+
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
+
             if ("DELETE".equals(exchange.getRequestMethod())) {
                 int cantidad = historicoPedidos.size();
                 historicoPedidos.clear();
                 System.out.println("Se eliminaron " + cantidad + " pedidos.");
-                enviarRespuesta(exchange, 200, "{\"exito\":true,\"cantidad\":" + cantidad + "}");
+                enviarRespuesta(exchange, 200,
+                        "{\"exito\":true,\"cantidad\":" + cantidad + "}");
             } else {
                 enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
             }
@@ -194,10 +218,12 @@ if (esPanaderia) {
         // ── POST /api/stock/actualizar ────────────────────────────────────────
         servidor.createContext("/api/stock/actualizar", exchange -> {
             agregarCorsHeaders(exchange);
+
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
+
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
                     String body = readBody(exchange);
@@ -215,7 +241,8 @@ if (esPanaderia) {
                     enviarRespuesta(exchange, 200, "{\"exito\":true}");
                 } catch (Exception e) {
                     e.printStackTrace();
-                    enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"" + e.getMessage() + "\"}");
+                    enviarRespuesta(exchange, 400,
+                            "{\"exito\":false,\"error\":\"" + e.getMessage() + "\"}");
                 }
             } else {
                 enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
@@ -225,14 +252,16 @@ if (esPanaderia) {
         // ── GET /api/stock ────────────────────────────────────────────────────
         servidor.createContext("/api/stock", exchange -> {
             agregarCorsHeaders(exchange);
+
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
+
             if ("GET".equals(exchange.getRequestMethod())) {
                 StringBuilder json = new StringBuilder("{");
                 stockMemoria.forEach((k, v) ->
-                    json.append("\"").append(k).append("\":").append(v).append(","));
+                        json.append("\"").append(k).append("\":").append(v).append(","));
                 if (json.charAt(json.length() - 1) == ',')
                     json.deleteCharAt(json.length() - 1);
                 json.append("}");
@@ -245,7 +274,8 @@ if (esPanaderia) {
         // ── GET / — Health check ──────────────────────────────────────────────
         servidor.createContext("/", exchange -> {
             agregarCorsHeaders(exchange);
-            enviarRespuesta(exchange, 200, "{\"status\":\"ok\",\"puerto\":" + PUERTO + "}");
+            enviarRespuesta(exchange, 200,
+                    "{\"status\":\"ok\",\"puerto\":" + PUERTO + "}");
         });
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
