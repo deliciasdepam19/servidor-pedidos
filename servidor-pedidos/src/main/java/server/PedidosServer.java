@@ -576,13 +576,16 @@ public class PedidosServer {
         try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
     }
 
-    private String sanitizar(String valor) {
-        if (valor == null) return "-";
-        return valor.replaceAll("[\\p{Cntrl}]", "")
-                .replaceAll("[<>\"']", "")
-                .trim()
-                .substring(0, Math.min(valor.length(), 200));
-    }
+private String sanitizar(String valor) {
+    if (valor == null) return "-";
+    
+    String limpio = valor
+            .replaceAll("[\\p{Cntrl}]", "")
+            .replaceAll("[<>\"']", "")
+            .trim();
+
+    return limpio.substring(0, Math.min(limpio.length(), 200));
+}
 
     public static void main(String[] args) throws IOException {
         PedidosServer server = new PedidosServer();
