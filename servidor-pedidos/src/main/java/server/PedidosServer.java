@@ -79,13 +79,13 @@ public class PedidosServer {
                     boolean fueraHorario;
                     String mensajeHorario;
 
-                    if (esPanaderia) {
-                        fueraHorario = hora >= 18;
-                        mensajeHorario = "Los pedidos de Panadería solo se reciben hasta las 18:00 hrs.";
-                    } else {
-                        fueraHorario = hora >= 22;
-                        mensajeHorario = "Los pedidos solo se reciben hasta las 22:00 hrs.";
-                    }
+if (esPanaderia) {
+    fueraHorario = hora < 12 || hora >= 18;
+    mensajeHorario = "Los pedidos de Panadería se reciben entre las 12:00 y las 18:00 hrs.";
+} else {
+    fueraHorario = hora < 18 || hora >= 22;
+    mensajeHorario = "Los pedidos se reciben entre las 18:00 y las 22:00 hrs.";
+}
 
                     if (fueraHorario) {
                         System.err.println("Pedido rechazado por horario (" + hora + ":xx) - esPanaderia=" + esPanaderia);
