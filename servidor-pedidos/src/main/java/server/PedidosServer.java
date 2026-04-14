@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,7 @@ public class PedidosServer {
             this.telefono = telefono;
             this.detalle = detalle;
             this.total = total;
-            this.timestamp = LocalDateTime.now().format(
+            this.timestamp = LocalDateTime.now(ZoneId.of("America/Santiago")).format(
                     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         }
     }
@@ -68,13 +69,38 @@ public class PedidosServer {
                     String detalle  = extraerValor(body, "detalle");
                     double total    = extraerDouble(body, "total");
 
+                    // ── Validación de horario (hora Chile) ────────────────────
+                    LocalDateTime ahora = LocalDateTime.now(ZoneId.of("America/Santiago"));
+                    int hora = ahora.getHour();
+
+                    boolean esPanaderia = detalle != null && (
+                            detalle.contains("Panadería ") || detalle.contains("Panaderia "));
+
+                    boolean fueraHorario;
+                    String mensajeHorario;
+
+                    if (esPanaderia) {
+                        fueraHorario = hora >= 18;
+                        mensajeHorario = "Los pedidos de Panadería solo se reciben hasta las 18:00 hrs.";
+                    } else {
+                        fueraHorario = hora >= 22;
+                        mensajeHorario = "Los pedidos solo se reciben hasta las 22:00 hrs.";
+                    }
+
+                    if (fueraHorario) {
+                        System.err.println("Pedido rechazado por horario (" + hora + ":xx) - esPanaderia=" + esPanaderia);
+                        enviarRespuesta(exchange, 403,
+                                "{\"exito\":false,\"error\":\"" + mensajeHorario + "\"}");
+                        return;
+                    }
+                    // ─────────────────────────────────────────────────────────
+
                     System.out.println("TEST body: " + body);
 
                     int numeroPedido = historicoPedidos.size() + 1;
                     Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
                     historicoPedidos.add(pedido);
 
-                    // Descontar stock en memoria
                     descontarStock(detalle);
 
                     for (PedidoListener listener : listeners) {
@@ -165,7 +191,7 @@ public class PedidosServer {
             }
         });
 
-        // ── POST /api/stock/actualizar — recibe stock desde app local ─────────
+        // ── POST /api/stock/actualizar ────────────────────────────────────────
         servidor.createContext("/api/stock/actualizar", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -175,7 +201,6 @@ public class PedidosServer {
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
                     String body = readBody(exchange);
-                    // Parsear JSON simple: {"carne_pino":10,"pollo_pino":5}
                     body = body.replace("{", "").replace("}", "").trim();
                     for (String par : body.split(",")) {
                         String[] kv = par.split(":");
@@ -197,7 +222,7 @@ public class PedidosServer {
             }
         });
 
-        // ── GET /api/stock — devuelve stock actual ────────────────────────────
+        // ── GET /api/stock ────────────────────────────────────────────────────
         servidor.createContext("/api/stock", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
