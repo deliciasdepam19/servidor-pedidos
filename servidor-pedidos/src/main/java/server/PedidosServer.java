@@ -541,6 +541,8 @@ public class PedidosServer {
         exchange.getResponseHeaders().set("Access-Control-Allow-Origin",  "*");
         exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
+        exchange.getResponseHeaders().set("Access-Control-Max-Age", "86400");
     }
 
     private void enviarRespuesta(HttpExchange exchange, int codigo, String respuesta) throws IOException {
