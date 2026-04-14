@@ -556,7 +556,6 @@ public class PedidosServer {
         return texto.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 
-    // ✅ CORS corregido: sin Allow-Credentials (incompatible con Allow-Origin: *)
     private void agregarCorsHeaders(HttpExchange exchange) {
         exchange.getResponseHeaders().set("Access-Control-Allow-Origin",  "*");
         exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
