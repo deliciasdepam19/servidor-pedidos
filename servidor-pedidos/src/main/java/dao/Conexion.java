@@ -12,7 +12,8 @@ public class Conexion {
     public static final String REPORTES_EMPANADAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Empanadas/Excel/";
     public static final String REPORTES_RAPIDOS_EXCEL = "G:/Mi unidad/Reportes/Reportes Prod.Rapidos/excel";
 
-    private static final String URL = "jdbc:sqlite:" + BASE_PATH + "deliciasPam.db";
+    private static final String DB_PATH = resolverRutaBD();
+    private static final String URL = "jdbc:sqlite:" + DB_PATH;
     private static final long CACHE_TTL_MS = 2000;
 
     private static Connection sharedConn;
@@ -28,7 +29,7 @@ public class Conexion {
             System.out.println("✓ Conexión inicializada");
             System.out.println("✓ BD: " + URL);
         } catch (Exception e) {
-            System.err.println("❌ Error inicializando conexión: " + e.getMessage());
+            System.err.println("Error inicializando conexión: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -49,7 +50,7 @@ public class Conexion {
         synchronized (LOCK) {
             try {
                 if (sharedConn == null || sharedConn.isClosed()) {
-                    System.out.println("⚠️ Reconectando...");
+                    System.out.println("Reconectando...");
                     sharedConn = crearConexion();
                 }
                 try (Statement st = sharedConn.createStatement()) {
@@ -140,5 +141,22 @@ public class Conexion {
             this.result = result;
             this.timestamp = timestamp;
         }
+    }
+
+    private static String resolverRutaBD() {
+        String env = System.getenv("DB_PATH");
+        if (env != null && !env.isBlank()) {
+            System.out.println("✓ BD desde variable de entorno: " + env);
+            return env;
+        }
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (!os.contains("win")) {
+            String path = "/opt/render/project/data/deliciasPam.db";
+            new java.io.File(path).getParentFile().mkdirs();
+            System.out.println("✓ BD en servidor Linux: " + path);
+            return path;
+        }
+        System.out.println("✓ BD local Windows: " + BASE_PATH);
+        return BASE_PATH + "deliciasPam.db";
     }
 }
