@@ -24,7 +24,7 @@ public class PedidosServer {
     private final AdminDAO adminDAO   = new AdminDAO();
 
     private static final String ADMIN_USER = "admin";
-    private static final String ADMIN_PASS = "deliciaspam2024";  // ← cambia esto
+    private static final String ADMIN_PASS = "King1919";  
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT"))
