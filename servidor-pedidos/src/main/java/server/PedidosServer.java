@@ -4,6 +4,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dao.AdminDAO;
 import dao.VentaDAO;
+import dao.PedidosDAO;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -20,7 +22,7 @@ public class PedidosServer {
 
     private final VentaDAO ventaDAO = new VentaDAO();
     private final AdminDAO adminDAO = new AdminDAO();
-    private final dao.PedidosDAO pedidosDAO = new dao.PedidosDAO();
+    private final PedidosDAO pedidosDAO = new PedidosDAO();
 
     private static final String ADMIN_USER = System.getenv("ADMIN_USER");
     private static final String ADMIN_PASS = System.getenv("ADMIN_PASS");
@@ -94,7 +96,8 @@ public class PedidosServer {
                         return;
                     }
 
-                    contadorPorIp.put(ip, (ultimo == null || (ahoraMs - ultimo) >= 600_000) ? 1 : contador + 1);
+                    contadorPorIp.put(ip,
+                            (ultimo == null || (ahoraMs - ultimo) >= 600_000) ? 1 : contador + 1);
                     ultimoPedidoPorIp.put(ip, ahoraMs);
 
                     if (adminDAO.estaBloqueada(ip)) {
@@ -108,17 +111,11 @@ public class PedidosServer {
                     double total = extraerDouble(body, "total");
 
                     String tipoPago = extraerValor(body, "tipoPago");
-                    if ("-".equals(tipoPago) || tipoPago.isBlank()) {
+                    if (tipoPago.isBlank() || "-".equals(tipoPago)) {
                         tipoPago = "EFECTIVO";
                     }
 
-                    int numeroPedido = ventaDAO.obtenerSiguienteNumeroPedido();
-                    Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
-
-                    historicoPedidos.add(pedido);
-
-                    pedidosDAO.guardarPedido(
-                            numeroPedido,
+                    int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
                             cliente,
                             telefono,
                             detalle,
@@ -127,8 +124,13 @@ public class PedidosServer {
                             "WEB"
                     );
 
-                    boolean procesadoItems = registrarDesdeItems(body, tipoPago, cliente);
-                    registrarDesdeDetalle(detalle, total, tipoPago, cliente);
+                    int numeroPedido = resultado[1];
+
+                    Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
+                    historicoPedidos.add(pedido);
+
+                    registrarDesdeItems(body, tipoPago);
+                    registrarDesdeDetalle(detalle, total, tipoPago);
 
                     for (PedidoListener l : listeners) {
                         l.onNuevoPedido(pedido);
@@ -149,7 +151,7 @@ public class PedidosServer {
         });
     }
 
-    private boolean registrarDesdeItems(String body, String tipoPago, String cliente) {
+    private boolean registrarDesdeItems(String body, String tipoPago) {
         int idx = body.indexOf("\"items\":");
         if (idx == -1) {
             return false;
@@ -161,15 +163,12 @@ public class PedidosServer {
             return false;
         }
 
-        String arr = body.substring(start + 1, end);
-
-        String[] objetos = arr.split("\\},\\{");
+        String[] objetos = body.substring(start + 1, end).split("\\},\\{");
 
         boolean alguno = false;
 
         for (String obj : objetos) {
-
-            String nombre = extraerValorObj(obj, "nombre");
+            String nombre = extraerValor(obj, "nombre");
             int cantidad = (int) extraerDoubleObj(obj, "cantidad");
             double precio = extraerDoubleObj(obj, "precio");
 
@@ -181,9 +180,7 @@ public class PedidosServer {
                 precio = buscarUltimoPrecioRapido(nombre, nombre);
             }
 
-            // ✅ MEJORA 1: evitar precio 0
             if (precio <= 0) {
-                System.out.println("⚠ Precio no encontrado: " + nombre);
                 continue;
             }
 
@@ -194,14 +191,12 @@ public class PedidosServer {
         return alguno;
     }
 
-    private void registrarDesdeDetalle(String detalle, double total, String tipoPago, String cliente) {
+    private void registrarDesdeDetalle(String detalle, double total, String tipoPago) {
         if (detalle == null || detalle.isBlank()) {
             return;
         }
 
-        String[] items = detalle.split("\\+");
-
-        for (String item : items) {
+        for (String item : detalle.split("\\+")) {
             item = item.trim();
 
             if (!item.matches("\\d+x .+")) {
@@ -229,7 +224,7 @@ public class PedidosServer {
     private double buscarUltimoPrecioRapido(String n1, String n2) {
         String sql = "SELECT precio_unitario FROM ventas_rapidas WHERE LOWER(nombre)=LOWER(?) OR LOWER(nombre)=LOWER(?) ORDER BY id DESC LIMIT 1";
 
-        try (java.sql.Connection c = dao.Conexion.conectar(); java.sql.PreparedStatement ps = c.prepareStatement(sql)) {
+        try (var c = dao.Conexion.conectar(); var ps = c.prepareStatement(sql)) {
 
             ps.setString(1, n1);
             ps.setString(2, n2);
@@ -248,27 +243,18 @@ public class PedidosServer {
 
     private String extraerValor(String json, String clave) {
         String patron = "\"" + clave + "\":\"";
-        int inicio = json.indexOf(patron);
-        if (inicio == -1) {
+        int i = json.indexOf(patron);
+        if (i == -1) {
             return "-";
         }
-
-        inicio += patron.length();
-        int fin = json.indexOf("\"", inicio);
-
-        String valor = (fin == -1) ? "-" : json.substring(inicio, fin);
-
-        return valor.trim();
-    }
-
-    private String extraerValorObj(String obj, String clave) {
-        return extraerValor(obj, clave);
+        i += patron.length();
+        int f = json.indexOf("\"", i);
+        return (f == -1 ? "-" : json.substring(i, f)).trim();
     }
 
     private double extraerDoubleObj(String obj, String clave) {
         try {
-            String val = extraerValor(obj, clave);
-            return Double.parseDouble(val);
+            return Double.parseDouble(extraerValor(obj, clave));
         } catch (Exception e) {
             return 0;
         }
@@ -277,29 +263,23 @@ public class PedidosServer {
     private double extraerDouble(String json, String clave) {
         try {
             String patron = "\"" + clave + "\":";
-            int inicio = json.indexOf(patron);
-            if (inicio == -1) {
+            int i = json.indexOf(patron);
+            if (i == -1) {
                 return 0;
             }
-
-            inicio += patron.length();
-            int fin = json.indexOf(",", inicio);
-            if (fin == -1) {
-                fin = json.indexOf("}", inicio);
+            i += patron.length();
+            int f = json.indexOf(",", i);
+            if (f == -1) {
+                f = json.indexOf("}", i);
             }
-
-            return Double.parseDouble(json.substring(inicio, fin).trim());
-
+            return Double.parseDouble(json.substring(i, f).trim());
         } catch (Exception e) {
             return 0;
         }
     }
 
     private String sanitizar(String v) {
-        if (v == null) {
-            return "-";
-        }
-        return v.replaceAll("[<>\"']", "").trim();
+        return v == null ? "-" : v.replaceAll("[<>\"']", "").trim();
     }
 
     private String readBody(HttpExchange ex) throws IOException {
@@ -308,7 +288,7 @@ public class PedidosServer {
 
     private void agregarCorsHeaders(HttpExchange ex) {
         ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }
 
