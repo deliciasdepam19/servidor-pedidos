@@ -2,77 +2,35 @@ package server;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import dao.AdminDAO;
-import dao.VentaDAO;
 import dao.PedidosDAO;
-
-import java.io.IOException;
-import java.io.OutputStream;
+import dao.VentaDAO;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 public class PedidosServer {
 
     private final VentaDAO ventaDAO = new VentaDAO();
-    private final AdminDAO adminDAO = new AdminDAO();
     private final PedidosDAO pedidosDAO = new PedidosDAO();
-
-    private static final String ADMIN_USER = System.getenv("ADMIN_USER");
-    private static final String ADMIN_PASS = System.getenv("ADMIN_PASS");
-
-    static {
-        if (ADMIN_USER == null || ADMIN_PASS == null) {
-            throw new RuntimeException("ERROR: Variables de entorno ADMIN_USER y ADMIN_PASS no configuradas");
-        }
-    }
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT"))
             : 8888;
 
     private HttpServer servidor;
-    private List<PedidoListener> listeners = new CopyOnWriteArrayList<>();
-    private List<Pedido> historicoPedidos = new CopyOnWriteArrayList<>();
+
     private final Map<String, Long> ultimoPedidoPorIp = new ConcurrentHashMap<>();
     private final Map<String, Integer> contadorPorIp = new ConcurrentHashMap<>();
 
-    public static class Pedido {
-
-        public int numero;
-        public String cliente;
-        public String telefono;
-        public String detalle;
-        public double total;
-        public String timestamp;
-
-        public Pedido(int numero, String cliente, String telefono, String detalle, double total) {
-            this.numero = numero;
-            this.cliente = cliente;
-            this.telefono = telefono;
-            this.detalle = detalle;
-            this.total = total;
-            this.timestamp = LocalDateTime.now(ZoneId.of("America/Santiago"))
-                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        }
-    }
-
-    @FunctionalInterface
-    public interface PedidoListener {
-
-        void onNuevoPedido(Pedido pedido);
-    }
-
     public PedidosServer() throws IOException {
+
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
         servidor.createContext("/api/pedidos", exchange -> {
+
             agregarCorsHeaders(exchange);
 
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -81,29 +39,9 @@ public class PedidosServer {
             }
 
             if ("POST".equals(exchange.getRequestMethod())) {
-                String ip = exchange.getRemoteAddress().getAddress().getHostAddress();
-
                 try {
+
                     String body = readBody(exchange);
-
-                    long ahoraMs = System.currentTimeMillis();
-                    Long ultimo = ultimoPedidoPorIp.get(ip);
-                    int contador = contadorPorIp.getOrDefault(ip, 0);
-
-                    if (ultimo != null && (ahoraMs - ultimo) < 600_000 && contador >= 5) {
-                        enviarRespuesta(exchange, 429,
-                                "{\"exito\":false,\"error\":\"Demasiados pedidos.\"}");
-                        return;
-                    }
-
-                    contadorPorIp.put(ip,
-                            (ultimo == null || (ahoraMs - ultimo) >= 600_000) ? 1 : contador + 1);
-                    ultimoPedidoPorIp.put(ip, ahoraMs);
-
-                    if (adminDAO.estaBloqueada(ip)) {
-                        enviarRespuesta(exchange, 403, "{\"error\":\"Bloqueado\"}");
-                        return;
-                    }
 
                     String cliente = sanitizar(extraerValor(body, "cliente"));
                     String telefono = sanitizar(extraerValor(body, "telefono"));
@@ -111,7 +49,7 @@ public class PedidosServer {
                     double total = extraerDouble(body, "total");
 
                     String tipoPago = extraerValor(body, "tipoPago");
-                    if (tipoPago.isBlank() || "-".equals(tipoPago)) {
+                    if ("-".equals(tipoPago) || tipoPago.isBlank()) {
                         tipoPago = "EFECTIVO";
                     }
 
@@ -120,125 +58,80 @@ public class PedidosServer {
                             telefono,
                             detalle,
                             total,
-                            "-",
+                            "NOCHE",
                             "WEB"
                     );
 
+                    int id = resultado[0];
                     int numeroPedido = resultado[1];
 
-                    Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
-                    historicoPedidos.add(pedido);
+                    StockDescontador.descontarDesdeDetalle(detalle);
+                    registrarVentaDesdeWeb(body, tipoPago, cliente);
 
-                    registrarDesdeItems(body, tipoPago);
-                    registrarDesdeDetalle(detalle, total, tipoPago);
+                    String respuesta = "{"
+                            + "\"exito\":true,"
+                            + "\"id\":" + id + ","
+                            + "\"numero\":" + numeroPedido
+                            + "}";
 
-                    for (PedidoListener l : listeners) {
-                        l.onNuevoPedido(pedido);
-                    }
-
-                    enviarRespuesta(exchange, 200,
-                            "{\"exito\":true,\"numero\":\"" + String.format("%03d", numeroPedido) + "\"}");
+                    enviarRespuesta(exchange, 200, respuesta);
 
                 } catch (Exception e) {
                     e.printStackTrace();
-                    enviarRespuesta(exchange, 400,
-                            "{\"error\":\"" + e.getMessage() + "\"}");
+                    enviarRespuesta(exchange, 400, "{\"exito\":false}");
                 }
-
-            } else {
-                enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
             }
         });
+
+        servidor.createContext("/api/pedidos/historico", exchange -> {
+
+            agregarCorsHeaders(exchange);
+
+            if ("GET".equals(exchange.getRequestMethod())) {
+
+                List<PedidosDAO.PedidoBD> pedidos = pedidosDAO.cargarPedidosDeHoy();
+
+                StringBuilder json = new StringBuilder("[");
+
+                for (int i = 0; i < pedidos.size(); i++) {
+
+                    PedidosDAO.PedidoBD p = pedidos.get(i);
+
+                    json.append("{")
+                            .append("\"id\":").append(p.id).append(",")
+                            .append("\"numero\":").append(p.numero).append(",")
+                            .append("\"numeroFormateado\":\"")
+                            .append(PedidosDAO.formatearNumero(p.numero, p.origen))
+                            .append("\",")
+                            .append("\"cliente\":\"").append(escaparJson(p.cliente)).append("\",")
+                            .append("\"telefono\":\"").append(escaparJson(p.telefono)).append("\",")
+                            .append("\"detalle\":\"").append(escaparJson(p.detalle)).append("\",")
+                            .append("\"total\":").append(p.total).append(",")
+                            .append("\"estado\":\"").append(p.estado).append("\",")
+                            .append("\"timestamp\":\"").append(p.timestamp).append("\"")
+                            .append("}");
+
+                    if (i < pedidos.size() - 1) {
+                        json.append(",");
+                    }
+                }
+
+                json.append("]");
+                enviarRespuesta(exchange, 200, json.toString());
+            }
+        });
+
+        servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
+        System.out.println("Servidor OK puerto " + PUERTO);
     }
 
-    private boolean registrarDesdeItems(String body, String tipoPago) {
-        int idx = body.indexOf("\"items\":");
-        if (idx == -1) {
-            return false;
-        }
-
-        int start = body.indexOf("[", idx);
-        int end = body.lastIndexOf("]");
-        if (start == -1 || end == -1) {
-            return false;
-        }
-
-        String[] objetos = body.substring(start + 1, end).split("\\},\\{");
-
-        boolean alguno = false;
-
-        for (String obj : objetos) {
-            String nombre = extraerValor(obj, "nombre");
-            int cantidad = (int) extraerDoubleObj(obj, "cantidad");
-            double precio = extraerDoubleObj(obj, "precio");
-
-            if (nombre.isBlank() || cantidad <= 0) {
-                continue;
-            }
-
-            if (precio <= 0) {
-                precio = buscarUltimoPrecioRapido(nombre, nombre);
-            }
-
-            if (precio <= 0) {
-                continue;
-            }
-
-            ventaDAO.registrarVentaRapida(nombre, cantidad, precio, tipoPago);
-            alguno = true;
-        }
-
-        return alguno;
+    private void registrarVentaDesdeWeb(String body, String tipoPago, String cliente) {
+        double totalPedido = extraerDouble(body, "total");
+        ventaDAO.registrarVentaRapida("Pedido Web", 1, totalPedido, tipoPago);
     }
 
-    private void registrarDesdeDetalle(String detalle, double total, String tipoPago) {
-        if (detalle == null || detalle.isBlank()) {
-            return;
-        }
-
-        for (String item : detalle.split("\\+")) {
-            item = item.trim();
-
-            if (!item.matches("\\d+x .+")) {
-                continue;
-            }
-
-            int x = item.indexOf('x');
-            int cantidad = Integer.parseInt(item.substring(0, x).trim());
-            String nombre = item.substring(x + 1).trim();
-
-            double precio = buscarUltimoPrecioRapido(nombre, nombre);
-
-            if (precio <= 0 && total > 0) {
-                precio = total / cantidad;
-            }
-
-            if (precio <= 0) {
-                continue;
-            }
-
-            ventaDAO.registrarVentaRapida(nombre, cantidad, precio, tipoPago);
-        }
-    }
-
-    private double buscarUltimoPrecioRapido(String n1, String n2) {
-        String sql = "SELECT precio_unitario FROM ventas_rapidas WHERE LOWER(nombre)=LOWER(?) OR LOWER(nombre)=LOWER(?) ORDER BY id DESC LIMIT 1";
-
-        try (var c = dao.Conexion.conectar(); var ps = c.prepareStatement(sql)) {
-
-            ps.setString(1, n1);
-            ps.setString(2, n2);
-
-            var rs = ps.executeQuery();
-            if (rs.next()) {
-                return rs.getDouble(1);
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return 0;
+    private String readBody(HttpExchange exchange) throws IOException {
+        return new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
     }
 
     private String extraerValor(String json, String clave) {
@@ -249,15 +142,7 @@ public class PedidosServer {
         }
         i += patron.length();
         int f = json.indexOf("\"", i);
-        return (f == -1 ? "-" : json.substring(i, f)).trim();
-    }
-
-    private double extraerDoubleObj(String obj, String clave) {
-        try {
-            return Double.parseDouble(extraerValor(obj, clave));
-        } catch (Exception e) {
-            return 0;
-        }
+        return f == -1 ? "-" : json.substring(i, f);
     }
 
     private double extraerDouble(String json, String clave) {
@@ -272,32 +157,31 @@ public class PedidosServer {
             if (f == -1) {
                 f = json.indexOf("}", i);
             }
-            return Double.parseDouble(json.substring(i, f).trim());
+            return Double.parseDouble(json.substring(i, f));
         } catch (Exception e) {
             return 0;
         }
     }
 
+    private String escaparJson(String t) {
+        return t == null ? "" : t.replace("\"", "\\\"");
+    }
+
+    private void agregarCorsHeaders(HttpExchange e) {
+        e.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        e.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        e.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+    }
+
+    private void enviarRespuesta(HttpExchange ex, int code, String r) throws IOException {
+        byte[] b = r.getBytes(StandardCharsets.UTF_8);
+        ex.sendResponseHeaders(code, b.length);
+        ex.getResponseBody().write(b);
+        ex.close();
+    }
+
     private String sanitizar(String v) {
         return v == null ? "-" : v.replaceAll("[<>\"']", "").trim();
-    }
-
-    private String readBody(HttpExchange ex) throws IOException {
-        return new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-    }
-
-    private void agregarCorsHeaders(HttpExchange ex) {
-        ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    }
-
-    private void enviarRespuesta(HttpExchange ex, int code, String resp) throws IOException {
-        byte[] bytes = resp.getBytes(StandardCharsets.UTF_8);
-        ex.sendResponseHeaders(code, bytes.length);
-        try (OutputStream os = ex.getResponseBody()) {
-            os.write(bytes);
-        }
     }
 
     public void iniciar() {
