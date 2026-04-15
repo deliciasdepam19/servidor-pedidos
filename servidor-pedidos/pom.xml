@@ -5,11 +5,18 @@
   <artifactId>servidor-pedidos</artifactId>
   <version>1.0</version>
   <packaging>jar</packaging>
-
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
   </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>42.7.3</version>
+    </dependency>
+  </dependencies>
 
   <build>
     <plugins>
