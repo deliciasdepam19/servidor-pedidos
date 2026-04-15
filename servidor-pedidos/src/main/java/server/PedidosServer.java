@@ -271,66 +271,79 @@ public class PedidosServer {
             enviarRespuesta(exchange, 200, "{\"status\":\"ok\",\"puerto\":" + PUERTO + "}");
         });
 
-        servidor.createContext("/api/admin/stats", exchange -> {
-            agregarCorsHeaders(exchange);
-            if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
-            if (!autenticarAdmin(exchange)) { requerirAuth(exchange); return; }
-            enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerEstadisticas()));
-        });
+servidor.createContext("/api/admin/stats", exchange -> {
+    agregarCorsHeaders(exchange);
+    if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
+    if (!autenticarAdmin(exchange)) { requerirAuth(exchange); return; }
 
-        servidor.createContext("/api/admin/logs", exchange -> {
-            agregarCorsHeaders(exchange);
-            if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
-            if (!autenticarAdmin(exchange)) { requerirAuth(exchange); return; }
-            String query  = exchange.getRequestURI().getQuery();
-            int    limite = 200;
-            if (query != null && query.contains("limite=")) {
-                try { limite = Integer.parseInt(query.replaceAll(".*limite=(\\d+).*", "$1")); }
-                catch (Exception ignored) {}
-            }
-            enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerLogs(limite)));
-        });
+    registrarAcceso(exchange, "/api/admin/stats", 200);
+
+    enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerEstadisticas()));
+});
+       servidor.createContext("/api/admin/logs", exchange -> {
+    agregarCorsHeaders(exchange);
+    if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
+    if (!autenticarAdmin(exchange)) { requerirAuth(exchange); return; }
+
+    String query  = exchange.getRequestURI().getQuery();
+    int    limite = 200;
+
+    if (query != null && query.contains("limite=")) {
+        try { 
+            limite = Integer.parseInt(query.replaceAll(".*limite=(\\d+).*", "$1")); 
+        } catch (Exception ignored) {}
+    }
+
+    registrarAcceso(exchange, "/api/admin/logs", 200);
+
+    enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerLogs(limite)));
+});
 
         servidor.createContext("/api/admin/ips", exchange -> {
-            agregarCorsHeaders(exchange);
-            if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
-            if (!autenticarAdmin(exchange)) { requerirAuth(exchange); return; }
+    agregarCorsHeaders(exchange);
+    if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
+    if (!autenticarAdmin(exchange)) { requerirAuth(exchange); return; }
 
-            if ("GET".equals(exchange.getRequestMethod())) {
-                java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
-                resp.put("bloqueadas", adminDAO.obtenerIPsBloqueadas());
-                resp.put("top_ips",    adminDAO.obtenerTopIPs(30));
-                enviarRespuesta(exchange, 200, toJson(resp));
+    if ("GET".equals(exchange.getRequestMethod())) {
 
-            } else if ("POST".equals(exchange.getRequestMethod())) {
-                String body     = readBody(exchange);
-                String ipTarget = extraerValor(body, "ip");
-                String accion   = extraerValor(body, "accion");
-                String razon    = extraerValor(body, "razon");
-                if ("bloquear".equals(accion)) {
-                    adminDAO.bloquearIPManual(ipTarget, razon);
-                    enviarRespuesta(exchange, 200, "{\"ok\":true,\"accion\":\"bloqueada\"}");
-                } else if ("desbloquear".equals(accion)) {
-                    adminDAO.desbloquearIP(ipTarget);
-                    enviarRespuesta(exchange, 200, "{\"ok\":true,\"accion\":\"desbloqueada\"}");
-                } else {
-                    enviarRespuesta(exchange, 400, "{\"error\":\"accion invalida\"}");
-                }
-            } else {
-                enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
-            }
-        });
+        registrarAcceso(exchange, "/api/admin/ips", 200);
+
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("bloqueadas", adminDAO.obtenerIPsBloqueadas());
+        resp.put("top_ips",    adminDAO.obtenerTopIPs(30));
+
+        enviarRespuesta(exchange, 200, toJson(resp));
+
+    } else if ("POST".equals(exchange.getRequestMethod())) {
+
+        String body     = readBody(exchange);
+        String ipTarget = extraerValor(body, "ip");
+        String accion   = extraerValor(body, "accion");
+        String razon    = extraerValor(body, "razon");
+
+        if ("bloquear".equals(accion)) {
+            adminDAO.bloquearIPManual(ipTarget, razon);
+            enviarRespuesta(exchange, 200, "{\"ok\":true,\"accion\":\"bloqueada\"}");
+        } else if ("desbloquear".equals(accion)) {
+            adminDAO.desbloquearIP(ipTarget);
+            enviarRespuesta(exchange, 200, "{\"ok\":true,\"accion\":\"desbloqueada\"}");
+        } else {
+            enviarRespuesta(exchange, 400, "{\"error\":\"accion invalida\"}");
+        }
+    } else {
+        enviarRespuesta(exchange, 405, "{\"error\":\"Método no permitido\"}");
+    }
+});
 
         servidor.createContext("/api/admin/usuarios", exchange -> {
-            agregarCorsHeaders(exchange);
-            if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
-            if (!autenticarAdmin(exchange)) { requerirAuth(exchange); return; }
-            enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerUsuarios(500)));
-        });
+    agregarCorsHeaders(exchange);
+    if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
+    if (!autenticarAdmin(exchange)) { requerirAuth(exchange); return; }
 
-        servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
-        System.out.println("Servidor de Pedidos iniciado en puerto " + PUERTO);
-    }
+    registrarAcceso(exchange, "/api/admin/usuarios", 200);
+
+    enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerUsuarios(500)));
+});
 
     private boolean autenticarAdmin(HttpExchange exchange) {
         String auth = exchange.getRequestHeaders().getFirst("Authorization");
@@ -567,6 +580,20 @@ public class PedidosServer {
                 .trim();
         return limpio.substring(0, Math.min(limpio.length(), 200));
     }
+
+    private void registrarAcceso(HttpExchange exchange, String endpoint, int status) {
+    try {
+        String ip = exchange.getRemoteAddress().getAddress().getHostAddress();
+        String metodo = exchange.getRequestMethod();
+        String userAgent = exchange.getRequestHeaders().getFirst("User-Agent");
+
+        adminDAO.registrarIP(ip);
+        adminDAO.registrarLog(ip, metodo, endpoint, status, userAgent, null);
+
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
 
     public static void main(String[] args) throws IOException {
         PedidosServer server = new PedidosServer();
