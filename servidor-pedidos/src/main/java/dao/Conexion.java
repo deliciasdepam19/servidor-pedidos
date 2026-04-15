@@ -1,6 +1,5 @@
 package dao;
 
-import config.Config;
 import java.sql.*;
 import java.util.concurrent.*;
 
@@ -13,15 +12,14 @@ public class Conexion {
     public static final String REPORTES_EMPANADAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Empanadas/Excel/";
     public static final String REPORTES_RAPIDOS_EXCEL = "G:/Mi unidad/Reportes/Reportes Prod.Rapidos/excel";
 
-    // PostgreSQL
-    private static final String POSTGRES_HOST = Config.get("DB_HOST");
-    private static final String POSTGRES_DB = Config.get("DB_NAME");
-    private static final String POSTGRES_PORT = Config.get("DB_PORT");
-    private static final String POSTGRES_USER = Config.get("DB_USER");
-    private static final String POSTGRES_PASSWORD = Config.get("DB_PASSWORD");
+    private static final String POSTGRES_HOST = System.getenv("DB_HOST");
+    private static final String POSTGRES_DB = System.getenv("DB_NAME");
+    private static final String POSTGRES_PORT = System.getenv("DB_PORT");
+    private static final String POSTGRES_USER = System.getenv("DB_USER");
+    private static final String POSTGRES_PASSWORD = System.getenv("DB_PASSWORD");
 
-    private static final String URL
-            = "jdbc:postgresql://" + POSTGRES_HOST + ":" + POSTGRES_PORT + "/" + POSTGRES_DB;
+    private static final String URL =
+            "jdbc:postgresql://" + POSTGRES_HOST + ":" + POSTGRES_PORT + "/" + POSTGRES_DB;
 
     private static final long CACHE_TTL_MS = 2000;
 
@@ -33,21 +31,28 @@ public class Conexion {
     static {
         try {
             Class.forName("org.postgresql.Driver");
+
             cache = new ConcurrentHashMap<>();
+
+            if (POSTGRES_HOST == null || POSTGRES_DB == null ||
+                POSTGRES_PORT == null || POSTGRES_USER == null || POSTGRES_PASSWORD == null) {
+
+                throw new RuntimeException("Variables de entorno de BD no configuradas");
+            }
+
             sharedConn = crearConexion();
 
-            System.out.println("✓ Conexión PostgreSQL inicializada");
-            System.out.println("✓ Host: " + POSTGRES_HOST);
-            System.out.println("✓ DB: " + POSTGRES_DB);
+            System.out.println("Conexión PostgreSQL inicializada");
+            System.out.println("Host: " + POSTGRES_HOST);
+            System.out.println("DB: " + POSTGRES_DB);
 
         } catch (Exception e) {
-            System.err.println("❌ Error inicializando conexión: " + e.getMessage());
+            System.err.println("Error inicializando conexión: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     private static Connection crearConexion() throws SQLException {
-
         Connection conn = DriverManager.getConnection(
                 URL,
                 POSTGRES_USER,
@@ -55,7 +60,6 @@ public class Conexion {
         );
 
         conn.setAutoCommit(true);
-
         return conn;
     }
 
@@ -79,8 +83,7 @@ public class Conexion {
                     if (sharedConn != null) {
                         sharedConn.close();
                     }
-                } catch (Exception ignored) {
-                }
+                } catch (Exception ignored) {}
 
                 sharedConn = crearConexion();
                 return sharedConn;
@@ -94,12 +97,10 @@ public class Conexion {
                 if (!conn.getAutoCommit()) {
                     try {
                         conn.rollback();
-                    } catch (SQLException ignored) {
-                    }
+                    } catch (SQLException ignored) {}
                     conn.setAutoCommit(true);
                 }
-            } catch (SQLException ignored) {
-            }
+            } catch (SQLException ignored) {}
         }
     }
 
@@ -110,9 +111,7 @@ public class Conexion {
     }
 
     public static Object getCached(String key) {
-        if (key == null) {
-            return null;
-        }
+        if (key == null) return null;
 
         CachedResult cr = cache.get(key);
 
@@ -152,11 +151,10 @@ public class Conexion {
 
         cache.clear();
 
-        System.out.println("✓ Conexión PostgreSQL cerrada");
+        System.out.println("Conexión PostgreSQL cerrada");
     }
 
     private static class CachedResult {
-
         Object result;
         long timestamp;
 
