@@ -192,7 +192,7 @@ public class PedidosDAO {
         List<PedidoBD> lista = new ArrayList<>();
         String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, origen, fecha_hora "
                 + "FROM pedidos "
-                + "WHERE (fecha_hora - INTERVAL '4 hours')::date = CURRENT_DATE "
+                + "WHERE (fecha_hora::timestamptz - INTERVAL '4 hours')::date = CURRENT_DATE "
                 + "  AND estado NOT IN ('COBRADO', 'ELIMINADO') "
                 + "ORDER BY numero ASC";
 
