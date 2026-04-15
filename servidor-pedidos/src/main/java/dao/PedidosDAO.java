@@ -340,4 +340,54 @@ public class PedidosDAO {
             }
         }
     }
+
+    public List<PedidoBD> cargarPedidosPendientesDeHoy() {
+        List<PedidoBD> pedidos = new ArrayList<>();
+        Connection conn = null;
+
+        try {
+            conn = Conexion.conectar();
+
+            PreparedStatement ps = conn.prepareStatement(
+                    "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
+                    + "FROM pedidos "
+                    + "WHERE estado = 'PENDIENTE' "
+                    + "AND (fecha_hora::timestamptz - INTERVAL '4 hours')::date = CURRENT_DATE "
+                    + "ORDER BY fecha_hora ASC"
+            );
+
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                PedidoBD p = new PedidoBD(
+                        rs.getInt("id"),
+                        rs.getInt("numero"),
+                        rs.getString("cliente"),
+                        rs.getString("telefono"),
+                        rs.getString("detalle"),
+                        rs.getDouble("total"),
+                        rs.getString("estado"),
+                        rs.getString("franja"),
+                        rs.getString("fecha_hora")
+                );
+
+                p.origen = rs.getString("origen");
+
+                pedidos.add(p);
+            }
+
+            rs.close();
+            ps.close();
+
+        } catch (Exception e) {
+            System.out.println("Error cargando pedidos pendientes: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                Conexion.devolver(conn);
+            }
+        }
+
+        return pedidos;
+    }
 }
