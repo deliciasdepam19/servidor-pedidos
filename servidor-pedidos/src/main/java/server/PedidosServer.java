@@ -148,10 +148,12 @@ public class PedidosServer {
                         return;
                     }
 
-                    System.out.println("Pedido recibido desde IP: " + ip);
-                    int numeroPedido = historicoPedidos.size() + 1;
-                    Pedido pedido    = new Pedido(numeroPedido, cliente, telefono, detalle, total);
-                    historicoPedidos.add(pedido);
+System.out.println("Pedido recibido desde IP: " + ip);
+
+int numeroPedido = ventaDAO.obtenerSiguienteNumeroPedido();
+
+Pedido pedido = new Pedido(numeroPedido, cliente, telefono, detalle, total);
+historicoPedidos.add(pedido);
 
                     StockDescontador.descontarDesdeDetalle(detalle);
                     registrarVentaDesdeWeb(body, tipoPago, cliente);
@@ -161,8 +163,10 @@ public class PedidosServer {
                     adminDAO.registrarLog(ip, "POST", "/api/pedidos", 200,
                             exchange.getRequestHeaders().getFirst("User-Agent"), correo);
 
-                    enviarRespuesta(exchange, 200,
-                            "{\"exito\":true,\"mensaje\":\"Pedido recibido\",\"numero\":" + numeroPedido + "}");
+                   String numeroFormateado = String.format("%03d", numeroPedido);
+
+enviarRespuesta(exchange, 200,
+        "{\"exito\":true,\"mensaje\":\"Pedido recibido\",\"numero\":\"" + numeroFormateado + "\"}");
 
                 } catch (Exception e) {
                     e.printStackTrace();
