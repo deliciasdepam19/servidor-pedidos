@@ -1,5 +1,6 @@
 package dao;
 
+import config.Config;
 import java.sql.*;
 import java.util.concurrent.*;
 
@@ -12,8 +13,16 @@ public class Conexion {
     public static final String REPORTES_EMPANADAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Empanadas/Excel/";
     public static final String REPORTES_RAPIDOS_EXCEL = "G:/Mi unidad/Reportes/Reportes Prod.Rapidos/excel";
 
-    private static final String DB_PATH = resolverRutaBD();
-    private static final String URL = "jdbc:sqlite:" + DB_PATH;
+    // PostgreSQL
+    private static final String POSTGRES_HOST = Config.get("DB_HOST");
+    private static final String POSTGRES_DB = Config.get("DB_NAME");
+    private static final String POSTGRES_PORT = Config.get("DB_PORT");
+    private static final String POSTGRES_USER = Config.get("DB_USER");
+    private static final String POSTGRES_PASSWORD = Config.get("DB_PASSWORD");
+
+    private static final String URL
+            = "jdbc:postgresql://" + POSTGRES_HOST + ":" + POSTGRES_PORT + "/" + POSTGRES_DB;
+
     private static final long CACHE_TTL_MS = 2000;
 
     private static Connection sharedConn;
@@ -23,26 +32,30 @@ public class Conexion {
 
     static {
         try {
-            Class.forName("org.sqlite.JDBC");
+            Class.forName("org.postgresql.Driver");
             cache = new ConcurrentHashMap<>();
             sharedConn = crearConexion();
-            System.out.println("✓ Conexión inicializada");
-            System.out.println("✓ BD: " + URL);
+
+            System.out.println("✓ Conexión PostgreSQL inicializada");
+            System.out.println("✓ Host: " + POSTGRES_HOST);
+            System.out.println("✓ DB: " + POSTGRES_DB);
+
         } catch (Exception e) {
-            System.err.println("Error inicializando conexión: " + e.getMessage());
+            System.err.println("❌ Error inicializando conexión: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     private static Connection crearConexion() throws SQLException {
-        Connection conn = DriverManager.getConnection(URL);
-        try (Statement st = conn.createStatement()) {
-            st.execute("PRAGMA journal_mode=WAL;");
-            st.execute("PRAGMA synchronous=NORMAL;");
-            st.execute("PRAGMA cache_size=10000;");
-            st.execute("PRAGMA temp_store=MEMORY;");
-            st.execute("PRAGMA busy_timeout=10000;");
-        }
+
+        Connection conn = DriverManager.getConnection(
+                URL,
+                POSTGRES_USER,
+                POSTGRES_PASSWORD
+        );
+
+        conn.setAutoCommit(true);
+
         return conn;
     }
 
@@ -50,21 +63,25 @@ public class Conexion {
         synchronized (LOCK) {
             try {
                 if (sharedConn == null || sharedConn.isClosed()) {
-                    System.out.println("Reconectando...");
+                    System.out.println("Reconectando PostgreSQL...");
                     sharedConn = crearConexion();
                 }
+
                 try (Statement st = sharedConn.createStatement()) {
                     st.execute("SELECT 1");
                 }
+
                 return sharedConn;
+
             } catch (SQLException e) {
+
                 try {
                     if (sharedConn != null) {
                         sharedConn.close();
-
                     }
                 } catch (Exception ignored) {
                 }
+
                 sharedConn = crearConexion();
                 return sharedConn;
             }
@@ -96,10 +113,13 @@ public class Conexion {
         if (key == null) {
             return null;
         }
+
         CachedResult cr = cache.get(key);
+
         if (cr != null && (System.currentTimeMillis() - cr.timestamp) < CACHE_TTL_MS) {
             return cr.result;
         }
+
         cache.remove(key);
         return null;
     }
@@ -109,6 +129,7 @@ public class Conexion {
             cache.clear();
             return;
         }
+
         cache.keySet().removeIf(k -> k.contains(pattern));
     }
 
@@ -117,7 +138,7 @@ public class Conexion {
     }
 
     public static String getPoolStatus() {
-        return "Conexión única | Caché: " + cache.size() + " entradas";
+        return "PostgreSQL | Caché: " + cache.size() + " entradas";
     }
 
     public static void shutdown() {
@@ -128,8 +149,10 @@ public class Conexion {
         } catch (SQLException e) {
             System.err.println("Error cerrando conexión: " + e.getMessage());
         }
+
         cache.clear();
-        System.out.println("✓ Conexión cerrada");
+
+        System.out.println("✓ Conexión PostgreSQL cerrada");
     }
 
     private static class CachedResult {
@@ -141,22 +164,5 @@ public class Conexion {
             this.result = result;
             this.timestamp = timestamp;
         }
-    }
-
-    private static String resolverRutaBD() {
-        String env = System.getenv("DB_PATH");
-        if (env != null && !env.isBlank()) {
-            System.out.println("✓ BD desde variable de entorno: " + env);
-            return env;
-        }
-        String os = System.getProperty("os.name", "").toLowerCase();
-        if (!os.contains("win")) {
-            String path = "/opt/render/project/data/deliciasPam.db";
-            new java.io.File(path).getParentFile().mkdirs();
-            System.out.println("✓ BD en servidor Linux: " + path);
-            return path;
-        }
-        System.out.println("✓ BD local Windows: " + BASE_PATH);
-        return BASE_PATH + "deliciasPam.db";
     }
 }
