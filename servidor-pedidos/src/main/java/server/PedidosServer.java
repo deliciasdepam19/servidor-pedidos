@@ -349,6 +349,8 @@ servidor.createContext("/api/admin/stats", exchange -> {
     enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerUsuarios(500)));
 });
 
+    }
+
     private boolean autenticarAdmin(HttpExchange exchange) {
         String auth = exchange.getRequestHeaders().getFirst("Authorization");
         if (auth == null || !auth.startsWith("Basic ")) return false;
