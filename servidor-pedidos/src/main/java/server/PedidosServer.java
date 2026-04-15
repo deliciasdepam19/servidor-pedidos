@@ -22,11 +22,16 @@ public class PedidosServer {
     private final VentaDAO ventaDAO = new VentaDAO();
     private final AdminDAO adminDAO = new AdminDAO();
 
-    // ✅ Credenciales desde variables de entorno (sin hardcodeo)
-    private static final String ADMIN_USER = System.getenv("ADMIN_USER") != null
-            ? System.getenv("ADMIN_USER") : "admin";
-    private static final String ADMIN_PASS = System.getenv("ADMIN_PASS") != null
-            ? System.getenv("ADMIN_PASS") : "king1919";
+    private static final String ADMIN_USER = System.getenv("ADMIN_USER");
+    private static final String ADMIN_PASS = System.getenv("ADMIN_PASS");
+
+    static {
+    if (ADMIN_USER == null || ADMIN_PASS == null) {
+        throw new RuntimeException(
+            "ERROR: Variables de entorno ADMIN_USER y ADMIN_PASS no configuradas"
+        );
+    }
+}
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT"))
@@ -65,7 +70,6 @@ public class PedidosServer {
     public PedidosServer() throws IOException {
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
-        // ─── POST /api/pedidos ───────────────────────────────────────────────
         servidor.createContext("/api/pedidos", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -172,7 +176,6 @@ public class PedidosServer {
             }
         });
 
-        // ─── GET /api/pedidos/historico ──────────────────────────────────────
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -198,7 +201,6 @@ public class PedidosServer {
             }
         });
 
-        // ─── DELETE /api/pedidos/eliminar ────────────────────────────────────
         servidor.createContext("/api/pedidos/eliminar", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -226,7 +228,6 @@ public class PedidosServer {
             }
         });
 
-        // ─── DELETE /api/pedidos/limpiar ─────────────────────────────────────
         servidor.createContext("/api/pedidos/limpiar", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -242,7 +243,6 @@ public class PedidosServer {
             }
         });
 
-        // ─── GET /api/stock ──────────────────────────────────────────────────
         servidor.createContext("/api/stock", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -265,15 +265,12 @@ public class PedidosServer {
             }
         });
 
-        // ─── GET / (raíz) ────────────────────────────────────────────────────
-        // ✅ Ahora maneja OPTIONS correctamente
         servidor.createContext("/", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
             enviarRespuesta(exchange, 200, "{\"status\":\"ok\",\"puerto\":" + PUERTO + "}");
         });
 
-        // ─── GET /api/admin/stats ────────────────────────────────────────────
         servidor.createContext("/api/admin/stats", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -281,7 +278,6 @@ public class PedidosServer {
             enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerEstadisticas()));
         });
 
-        // ─── GET /api/admin/logs ─────────────────────────────────────────────
         servidor.createContext("/api/admin/logs", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -295,7 +291,6 @@ public class PedidosServer {
             enviarRespuesta(exchange, 200, toJson(adminDAO.obtenerLogs(limite)));
         });
 
-        // ─── GET/POST /api/admin/ips ─────────────────────────────────────────
         servidor.createContext("/api/admin/ips", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -326,7 +321,6 @@ public class PedidosServer {
             }
         });
 
-        // ─── GET /api/admin/usuarios ─────────────────────────────────────────
         servidor.createContext("/api/admin/usuarios", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) { exchange.sendResponseHeaders(204, -1); return; }
@@ -338,7 +332,6 @@ public class PedidosServer {
         System.out.println("Servidor de Pedidos iniciado en puerto " + PUERTO);
     }
 
-    // ─── Autenticación admin ─────────────────────────────────────────────────
     private boolean autenticarAdmin(HttpExchange exchange) {
         String auth = exchange.getRequestHeaders().getFirst("Authorization");
         if (auth == null || !auth.startsWith("Basic ")) return false;
@@ -354,7 +347,6 @@ public class PedidosServer {
         enviarRespuesta(exchange, 401, "{\"error\":\"No autorizado\"}");
     }
 
-    // ─── Serialización JSON manual ───────────────────────────────────────────
     private String toJson(Object obj) {
         if (obj == null) return "null";
         if (obj instanceof Boolean || obj instanceof Number) return obj.toString();
@@ -382,7 +374,6 @@ public class PedidosServer {
         return "\"" + obj + "\"";
     }
 
-    // ─── Registro de ventas ──────────────────────────────────────────────────
     private void registrarVentaDesdeWeb(String body, String tipoPago, String cliente) {
         if (registrarDesdeItems(body, tipoPago, cliente)) return;
         String detalle     = extraerValor(body, "detalle");
@@ -514,13 +505,11 @@ public class PedidosServer {
         return 0;
     }
 
-    // ─── Ciclo de vida ───────────────────────────────────────────────────────
     public void iniciar()  { servidor.start(); }
     public void detener()  { servidor.stop(0); System.out.println("Servidor detenido"); }
     public void registrarListener(PedidoListener listener) { listeners.add(listener); }
     public void removerListener(PedidoListener listener)   { listeners.remove(listener); }
 
-    // ─── Utilidades HTTP ─────────────────────────────────────────────────────
     private String readBody(HttpExchange exchange) throws IOException {
         final int MAX_BYTES = 65536;
         InputStream is = exchange.getRequestBody();
