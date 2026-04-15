@@ -58,7 +58,7 @@ public class PedidosServer {
                             telefono,
                             detalle,
                             total,
-                            "NOCHE",
+                            franja,
                             "WEB"
                     );
 
