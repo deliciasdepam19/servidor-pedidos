@@ -192,8 +192,8 @@ public class PedidosDAO {
         List<PedidoBD> lista = new ArrayList<>();
         String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, origen, fecha_hora "
                 + "FROM pedidos "
-                + "WHERE (fecha_hora::timestamptz - INTERVAL '4 hours')::date = CURRENT_DATE "
-                + "  AND estado NOT IN ('COBRADO', 'ELIMINADO') "
+                + "WHERE fecha_hora::date = CURRENT_DATE "
+                + "AND estado NOT IN ('COBRADO', 'ELIMINADO') "
                 + "ORDER BY numero ASC";
 
         Connection conn = null;
@@ -352,7 +352,7 @@ public class PedidosDAO {
                     "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
                     + "FROM pedidos "
                     + "WHERE estado = 'PENDIENTE' "
-                    + "AND (fecha_hora::timestamptz - INTERVAL '4 hours')::date = CURRENT_DATE "
+                    + "AND fecha_hora::date = CURRENT_DATE "
                     + "ORDER BY fecha_hora ASC"
             );
 
