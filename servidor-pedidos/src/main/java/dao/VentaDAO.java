@@ -270,6 +270,40 @@ public class VentaDAO {
         return java.time.LocalDate.now().toString();
     }
 
+    public boolean registrarVentaRapida(String nombre, int cantidad, double precioUnitario, String tipoPago) {
+    Connection conn = null;
+    try {
+        conn = Conexion.conectar();
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO ventas_rapidas (fecha, nombre, cantidad, precio_unitario, subtotal, tipo_pago, grupo_venta_id) "
+                + "VALUES (?, ?, ?, ?, ?, ?, NULL)")) {
+
+            ps.setString(1, java.time.LocalDate.now().toString());
+            ps.setString(2, nombre);
+            ps.setInt(3, cantidad);
+            ps.setDouble(4, precioUnitario);
+            ps.setDouble(5, precioUnitario * cantidad);
+            ps.setString(6, tipoPago);
+
+            int filas = ps.executeUpdate();
+            Conexion.invalidateCache("venta_");
+
+            return filas > 0;
+        }
+
+    } catch (SQLException e) {
+        System.err.println("Error en registrarVentaRapida: " + e.getMessage());
+        e.printStackTrace();
+        return false;
+
+    } finally {
+        if (conn != null) {
+            Conexion.devolver(conn);
+        }
+    }
+}
+
     private double queryDouble(String sql, String param) {
 
         try (Connection conn = Conexion.conectar();
