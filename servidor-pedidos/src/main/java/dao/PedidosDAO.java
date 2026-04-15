@@ -316,4 +316,28 @@ public class PedidosDAO {
             }
         }
     }
+
+    public void marcarComoProcesado(int id) {
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+
+            PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE pedidos SET estado = 'PROCESADO' WHERE id = ?"
+            );
+
+            ps.setInt(1, id);
+            ps.executeUpdate();
+
+            ps.close();
+
+        } catch (Exception e) {
+            System.out.println(" Error al marcar pedido como PROCESADO: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                Conexion.devolver(conn);
+            }
+        }
+    }
 }
