@@ -20,6 +20,7 @@ public class PedidosServer {
 
     private final VentaDAO ventaDAO = new VentaDAO();
     private final AdminDAO adminDAO = new AdminDAO();
+    private final dao.PedidosDAO pedidosDAO = new dao.PedidosDAO();
 
     private static final String ADMIN_USER = System.getenv("ADMIN_USER");
     private static final String ADMIN_PASS = System.getenv("ADMIN_PASS");
@@ -41,6 +42,7 @@ public class PedidosServer {
     private final Map<String, Integer> contadorPorIp = new ConcurrentHashMap<>();
 
     public static class Pedido {
+
         public int numero;
         public String cliente;
         public String telefono;
@@ -61,6 +63,7 @@ public class PedidosServer {
 
     @FunctionalInterface
     public interface PedidoListener {
+
         void onNuevoPedido(Pedido pedido);
     }
 
@@ -114,6 +117,16 @@ public class PedidosServer {
 
                     historicoPedidos.add(pedido);
 
+                    pedidosDAO.guardarPedido(
+                            numeroPedido,
+                            cliente,
+                            telefono,
+                            detalle,
+                            total,
+                            "-",
+                            "WEB"
+                    );
+
                     boolean procesadoItems = registrarDesdeItems(body, tipoPago, cliente);
                     registrarDesdeDetalle(detalle, total, tipoPago, cliente);
 
@@ -138,11 +151,15 @@ public class PedidosServer {
 
     private boolean registrarDesdeItems(String body, String tipoPago, String cliente) {
         int idx = body.indexOf("\"items\":");
-        if (idx == -1) return false;
+        if (idx == -1) {
+            return false;
+        }
 
         int start = body.indexOf("[", idx);
         int end = body.lastIndexOf("]");
-        if (start == -1 || end == -1) return false;
+        if (start == -1 || end == -1) {
+            return false;
+        }
 
         String arr = body.substring(start + 1, end);
 
@@ -156,7 +173,9 @@ public class PedidosServer {
             int cantidad = (int) extraerDoubleObj(obj, "cantidad");
             double precio = extraerDoubleObj(obj, "precio");
 
-            if (nombre.isBlank() || cantidad <= 0) continue;
+            if (nombre.isBlank() || cantidad <= 0) {
+                continue;
+            }
 
             if (precio <= 0) {
                 precio = buscarUltimoPrecioRapido(nombre, nombre);
@@ -176,14 +195,18 @@ public class PedidosServer {
     }
 
     private void registrarDesdeDetalle(String detalle, double total, String tipoPago, String cliente) {
-        if (detalle == null || detalle.isBlank()) return;
+        if (detalle == null || detalle.isBlank()) {
+            return;
+        }
 
         String[] items = detalle.split("\\+");
 
         for (String item : items) {
             item = item.trim();
 
-            if (!item.matches("\\d+x .+")) continue;
+            if (!item.matches("\\d+x .+")) {
+                continue;
+            }
 
             int x = item.indexOf('x');
             int cantidad = Integer.parseInt(item.substring(0, x).trim());
@@ -195,7 +218,9 @@ public class PedidosServer {
                 precio = total / cantidad;
             }
 
-            if (precio <= 0) continue;
+            if (precio <= 0) {
+                continue;
+            }
 
             ventaDAO.registrarVentaRapida(nombre, cantidad, precio, tipoPago);
         }
@@ -204,14 +229,15 @@ public class PedidosServer {
     private double buscarUltimoPrecioRapido(String n1, String n2) {
         String sql = "SELECT precio_unitario FROM ventas_rapidas WHERE LOWER(nombre)=LOWER(?) OR LOWER(nombre)=LOWER(?) ORDER BY id DESC LIMIT 1";
 
-        try (java.sql.Connection c = dao.Conexion.conectar();
-             java.sql.PreparedStatement ps = c.prepareStatement(sql)) {
+        try (java.sql.Connection c = dao.Conexion.conectar(); java.sql.PreparedStatement ps = c.prepareStatement(sql)) {
 
             ps.setString(1, n1);
             ps.setString(2, n2);
 
             var rs = ps.executeQuery();
-            if (rs.next()) return rs.getDouble(1);
+            if (rs.next()) {
+                return rs.getDouble(1);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -223,7 +249,9 @@ public class PedidosServer {
     private String extraerValor(String json, String clave) {
         String patron = "\"" + clave + "\":\"";
         int inicio = json.indexOf(patron);
-        if (inicio == -1) return "-";
+        if (inicio == -1) {
+            return "-";
+        }
 
         inicio += patron.length();
         int fin = json.indexOf("\"", inicio);
@@ -250,11 +278,15 @@ public class PedidosServer {
         try {
             String patron = "\"" + clave + "\":";
             int inicio = json.indexOf(patron);
-            if (inicio == -1) return 0;
+            if (inicio == -1) {
+                return 0;
+            }
 
             inicio += patron.length();
             int fin = json.indexOf(",", inicio);
-            if (fin == -1) fin = json.indexOf("}", inicio);
+            if (fin == -1) {
+                fin = json.indexOf("}", inicio);
+            }
 
             return Double.parseDouble(json.substring(inicio, fin).trim());
 
@@ -264,7 +296,9 @@ public class PedidosServer {
     }
 
     private String sanitizar(String v) {
-        if (v == null) return "-";
+        if (v == null) {
+            return "-";
+        }
         return v.replaceAll("[<>\"']", "").trim();
     }
 
