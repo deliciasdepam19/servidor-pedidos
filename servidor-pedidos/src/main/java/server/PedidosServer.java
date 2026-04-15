@@ -593,7 +593,6 @@ servidor.createContext("/api/admin/stats", exchange -> {
         e.printStackTrace();
     }
 }
-}
 
     public static void main(String[] args) throws IOException {
         PedidosServer server = new PedidosServer();
