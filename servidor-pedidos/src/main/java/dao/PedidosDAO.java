@@ -43,7 +43,7 @@ public class PedidosDAO {
     public int[] guardarPedidoAutoNumero(String cliente, String telefono,
             String detalle, double total, String franja, String origen) {
 
-        String sqlNum = "SELECT COALESCE(MAX(numero), 0) + 1 FROM pedidos ";
+        String sqlNum = "SELECT COALESCE(MAX(numero), 0) + 1 FROM pedidos FOR UPDATE";
         String sqlIns = "INSERT INTO pedidos (numero, cliente, telefono, detalle, total, estado, franja, origen) "
                 + "VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?, ?)";
 
@@ -53,11 +53,9 @@ public class PedidosDAO {
             conn.setAutoCommit(false);
 
             int numero = 1;
-            try (PreparedStatement psNum = conn.prepareStatement(sqlNum)) {
-                try (ResultSet rs = psNum.executeQuery()) {
-                    if (rs.next()) {
-                        numero = rs.getInt(1);
-                    }
+            try (PreparedStatement psNum = conn.prepareStatement(sqlNum); ResultSet rs = psNum.executeQuery()) {
+                if (rs.next()) {
+                    numero = rs.getInt(1);
                 }
             }
 
