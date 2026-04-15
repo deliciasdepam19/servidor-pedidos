@@ -43,7 +43,7 @@ public class PedidosDAO {
     public int[] guardarPedidoAutoNumero(String cliente, String telefono,
             String detalle, double total, String franja, String origen) {
 
-        String sqlNum = "SELECT COALESCE(MAX(numero), 0) + 1 FROM pedidos FOR UPDATE";
+        String sqlNum = "SELECT nextval('pedidos_numero_seq')";
         String sqlIns = "INSERT INTO pedidos (numero, cliente, telefono, detalle, total, estado, franja, origen) "
                 + "VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?, ?)";
 
