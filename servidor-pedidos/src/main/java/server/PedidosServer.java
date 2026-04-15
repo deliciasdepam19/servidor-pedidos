@@ -119,7 +119,7 @@ public class PedidosServer {
                             .append("\"total\":").append(p.total).append(",")
                             .append("\"estado\":\"").append(p.estado).append("\",")
                             .append("\"franja\":\"").append(p.franja).append("\",")
-                            .append("\"timestamp\":\"").append(p.timestamp).append("\"")
+                            .append("\"timestamp\":\"" + obtenerHoraExacta() + "\"")
                             .append("}");
 
                     if (i < pedidos.size() - 1) {
@@ -193,7 +193,11 @@ public class PedidosServer {
 
     private String calcularFranjaActual(String detalle) {
 
-        int hora = java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago")).getHour();
+        java.time.LocalTime ahora = java.time.LocalTime.now(
+                java.time.ZoneId.of("America/Santiago"));
+
+        int hora = ahora.getHour();
+        int minuto = ahora.getMinute();
 
         boolean esPanaderia = false;
 
@@ -207,42 +211,30 @@ public class PedidosServer {
         }
 
         if (esPanaderia) {
-            if (hora >= 12 && hora < 13) {
-                return "12:00 - 13:00";
+            if (hora < 12 || hora >= 18) {
+                return "FUERA HORARIO";
             }
-            if (hora >= 13 && hora < 14) {
-                return "13:00 - 14:00";
-            }
-            if (hora >= 14 && hora < 15) {
-                return "14:00 - 15:00";
-            }
-            if (hora >= 15 && hora < 16) {
-                return "15:00 - 16:00";
-            }
-            if (hora >= 16 && hora < 17) {
-                return "16:00 - 17:00";
-            }
-            if (hora >= 17 && hora < 18) {
-                return "17:00 - 18:00";
-            }
-
-            return "FUERA HORARIO";
         } else {
-            if (hora >= 18 && hora < 19) {
-                return "18:00 - 19:00";
+            if (hora < 18 || hora >= 22) {
+                return "FUERA HORARIO";
             }
-            if (hora >= 19 && hora < 20) {
-                return "19:00 - 20:00";
-            }
-            if (hora >= 20 && hora < 21) {
-                return "20:00 - 21:00";
-            }
-            if (hora >= 21 && hora < 22) {
-                return "21:00 - 22:00";
-            }
-
-            return "FUERA HORARIO";
         }
+
+        int inicioMin = (minuto < 30) ? 0 : 30;
+        int finMin = (inicioMin == 0) ? 30 : 60;
+
+        int horaFin = (finMin == 60) ? hora + 1 : hora;
+        finMin = (finMin == 60) ? 0 : finMin;
+
+        return String.format("%02d:%02d - %02d:%02d",
+                hora, inicioMin,
+                horaFin, finMin);
+    }
+
+    private String obtenerHoraExacta() {
+        return java.time.LocalTime.now(
+                java.time.ZoneId.of("America/Santiago"))
+                .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
     }
 
     private String sanitizar(String v) {
