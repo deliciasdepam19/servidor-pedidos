@@ -812,4 +812,31 @@ public class VentaDAO {
                 .trim();
         return normalizada.equals("rapido");
     }
+
+    public int obtenerSiguienteNumeroPedido() {
+    Connection conn = null;
+    try {
+        conn = Conexion.conectar();
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT COALESCE(MAX(numero),0) + 1 FROM pedidos")) {
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        }
+
+    } catch (SQLException e) {
+        System.err.println("Error obteniendo numero pedido: " + e.getMessage());
+        e.printStackTrace();
+    } finally {
+        if (conn != null) {
+            Conexion.devolver(conn);
+        }
+    }
+
+    return 1;
+}
 }
