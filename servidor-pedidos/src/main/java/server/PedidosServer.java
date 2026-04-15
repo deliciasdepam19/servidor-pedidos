@@ -581,18 +581,18 @@ servidor.createContext("/api/admin/stats", exchange -> {
         return limpio.substring(0, Math.min(limpio.length(), 200));
     }
 
-    private void registrarAcceso(HttpExchange exchange, String endpoint, int status) {
+   private void registrarAcceso(HttpExchange exchange, String endpoint, int status) {
     try {
         String ip = exchange.getRemoteAddress().getAddress().getHostAddress();
         String metodo = exchange.getRequestMethod();
         String userAgent = exchange.getRequestHeaders().getFirst("User-Agent");
 
-        adminDAO.registrarIP(ip);
         adminDAO.registrarLog(ip, metodo, endpoint, status, userAgent, null);
 
     } catch (Exception e) {
         e.printStackTrace();
     }
+}
 }
 
     public static void main(String[] args) throws IOException {
