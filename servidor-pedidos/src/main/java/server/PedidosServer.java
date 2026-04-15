@@ -53,6 +53,16 @@ public class PedidosServer {
                         tipoPago = "EFECTIVO";
                     }
 
+                    System.out.println("INSERTANDO PEDIDO: " + cliente + " - " + System.currentTimeMillis());
+
+                    String franja = calcularFranjaActual(detalle);
+
+                    if ("FUERA HORARIO".equals(franja)) {
+                        enviarRespuesta(exchange, 403,
+                                "{\"exito\":false,\"error\":\"Pedido fuera de horario permitido\"}");
+                        return;
+                    }
+
                     int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
                             cliente,
                             telefono,
@@ -108,6 +118,7 @@ public class PedidosServer {
                             .append("\"detalle\":\"").append(escaparJson(p.detalle)).append("\",")
                             .append("\"total\":").append(p.total).append(",")
                             .append("\"estado\":\"").append(p.estado).append("\",")
+                            .append("\"franja\":\"").append(p.franja).append("\",")
                             .append("\"timestamp\":\"").append(p.timestamp).append("\"")
                             .append("}");
 
@@ -178,6 +189,60 @@ public class PedidosServer {
         ex.sendResponseHeaders(code, b.length);
         ex.getResponseBody().write(b);
         ex.close();
+    }
+
+    private String calcularFranjaActual(String detalle) {
+
+        int hora = java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago")).getHour();
+
+        boolean esPanaderia = false;
+
+        if (detalle != null) {
+            String d = detalle.toLowerCase();
+            esPanaderia
+                    = d.contains("panaderia")
+                    || d.contains("panadería")
+                    || d.contains("hallula")
+                    || d.contains("marraqueta");
+        }
+
+        if (esPanaderia) {
+            if (hora >= 12 && hora < 13) {
+                return "12:00 - 13:00";
+            }
+            if (hora >= 13 && hora < 14) {
+                return "13:00 - 14:00";
+            }
+            if (hora >= 14 && hora < 15) {
+                return "14:00 - 15:00";
+            }
+            if (hora >= 15 && hora < 16) {
+                return "15:00 - 16:00";
+            }
+            if (hora >= 16 && hora < 17) {
+                return "16:00 - 17:00";
+            }
+            if (hora >= 17 && hora < 18) {
+                return "17:00 - 18:00";
+            }
+
+            return "FUERA HORARIO";
+        } else {
+            if (hora >= 18 && hora < 19) {
+                return "18:00 - 19:00";
+            }
+            if (hora >= 19 && hora < 20) {
+                return "19:00 - 20:00";
+            }
+            if (hora >= 20 && hora < 21) {
+                return "20:00 - 21:00";
+            }
+            if (hora >= 21 && hora < 22) {
+                return "21:00 - 22:00";
+            }
+
+            return "FUERA HORARIO";
+        }
     }
 
     private String sanitizar(String v) {
