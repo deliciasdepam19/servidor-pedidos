@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import server.StockDescontador;
 
 public class PedidosServer {
 
@@ -130,6 +131,29 @@ public class PedidosServer {
 
                 json.append("]");
                 enviarRespuesta(exchange, 200, json.toString());
+            }
+        });
+
+        servidor.createContext("/api/stock", exchange -> {
+
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if ("GET".equals(exchange.getRequestMethod())) {
+                try {
+
+                    String stock = StockDescontador.obtenerStockJSON();
+
+                    enviarRespuesta(exchange, 200, stock);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    enviarRespuesta(exchange, 500, "{}");
+                }
             }
         });
 
