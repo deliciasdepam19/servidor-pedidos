@@ -3,7 +3,6 @@ package server;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dao.PedidosDAO;
-import dao.VentaDAO;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -13,7 +12,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class PedidosServer {
 
-    private final VentaDAO ventaDAO = new VentaDAO();
     private final PedidosDAO pedidosDAO = new PedidosDAO();
 
     private static final int PUERTO = System.getenv("PORT") != null
@@ -75,8 +73,6 @@ public class PedidosServer {
 
                     int id = resultado[0];
                     int numeroPedido = resultado[1];
-
-                    registrarVentaDesdeWeb(body, tipoPago, cliente);
 
                     String respuesta = "{"
                             + "\"exito\":true,"
@@ -157,11 +153,6 @@ public class PedidosServer {
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
-    }
-
-    private void registrarVentaDesdeWeb(String body, String tipoPago, String cliente) {
-        double totalPedido = extraerDouble(body, "total");
-        ventaDAO.registrarVentaRapida("Pedido Web", 1, totalPedido, tipoPago);
     }
 
     private String readBody(HttpExchange exchange) throws IOException {
