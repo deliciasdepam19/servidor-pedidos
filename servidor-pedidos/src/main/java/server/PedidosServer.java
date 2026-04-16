@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import server.StockDescontador;
 
 public class PedidosServer {
-
+   //si
     private final VentaDAO ventaDAO = new VentaDAO();
     private final PedidosDAO pedidosDAO = new PedidosDAO();
 
