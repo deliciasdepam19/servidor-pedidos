@@ -1,6 +1,7 @@
 package dao;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -9,18 +10,18 @@ public class VentaDAO {
     private static final String CACHE_PREFIX = "venta_";
 
     public double totalDelDia(String fecha) {
-        return queryDouble("SELECT COALESCE(SUM(total), 0) FROM ventas WHERE fecha = ?::date AND tipo_pago != 'PENDIENTE'", fecha)
-                + queryDouble("SELECT COALESCE(SUM(subtotal), 0) FROM ventas_rapidas WHERE fecha = ?::date AND grupo_venta_id IS NULL", fecha);
+        return queryDouble("SELECT COALESCE(SUM(total), 0) FROM ventas WHERE fecha = ? AND tipo_pago != 'PENDIENTE'", fecha)
+                + queryDouble("SELECT COALESCE(SUM(subtotal), 0) FROM ventas_rapidas WHERE fecha = ? AND grupo_venta_id IS NULL", fecha);
     }
 
     public double totalEfectivoDelDia(String fecha) {
-        return queryDouble("SELECT COALESCE(SUM(total), 0) FROM ventas WHERE fecha = ?::date AND tipo_pago = 'EFECTIVO'", fecha)
-                + queryDouble("SELECT COALESCE(SUM(subtotal), 0) FROM ventas_rapidas WHERE fecha = ?::date AND tipo_pago = 'EFECTIVO' AND grupo_venta_id IS NULL", fecha);
+        return queryDouble("SELECT COALESCE(SUM(total), 0) FROM ventas WHERE fecha = ? AND tipo_pago = 'EFECTIVO'", fecha)
+                + queryDouble("SELECT COALESCE(SUM(subtotal), 0) FROM ventas_rapidas WHERE fecha = ? AND tipo_pago = 'EFECTIVO' AND grupo_venta_id IS NULL", fecha);
     }
 
     public double totalTransferenciaDelDia(String fecha) {
-        return queryDouble("SELECT COALESCE(SUM(total), 0) FROM ventas WHERE fecha = ?::date AND tipo_pago = 'TRANSFERENCIA'", fecha)
-                + queryDouble("SELECT COALESCE(SUM(subtotal), 0) FROM ventas_rapidas WHERE fecha = ?::date AND tipo_pago = 'TRANSFERENCIA' AND grupo_venta_id IS NULL", fecha);
+        return queryDouble("SELECT COALESCE(SUM(total), 0) FROM ventas WHERE fecha = ? AND tipo_pago = 'TRANSFERENCIA'", fecha)
+                + queryDouble("SELECT COALESCE(SUM(subtotal), 0) FROM ventas_rapidas WHERE fecha = ? AND tipo_pago = 'TRANSFERENCIA' AND grupo_venta_id IS NULL", fecha);
     }
 
     public double totalPendienteDelDia() {
@@ -36,13 +37,13 @@ public class VentaDAO {
         Connection conn = null;
         try {
             conn = Conexion.conectar();
-            // ✅ FIX: agregado d.producto_tipo al GROUP BY para cumplir con PostgreSQL
+
             PreparedStatement stmt = conn.prepareStatement(
                     "SELECT d.nombre, SUM(d.cantidad) as total "
                     + "FROM ventas v JOIN detalle_ventas d ON v.id = d.venta_id "
-                    + "WHERE v.fecha = ?::date AND v.tipo_pago != 'PENDIENTE' "
+                    + "WHERE v.fecha = ? AND v.tipo_pago != 'PENDIENTE' "
                     + "GROUP BY d.nombre, d.producto_tipo ORDER BY d.producto_tipo, d.nombre");
-            stmt.setString(1, hoy());
+            stmt.setDate(1, java.sql.Date.valueOf(hoy()));
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
                 resumen.put(rs.getString("nombre"), rs.getInt("total"));
@@ -50,7 +51,7 @@ public class VentaDAO {
             rs.close();
             stmt.close();
         } catch (SQLException e) {
-            System.err.println("❌ Error en resumenDelDia: " + e.getMessage());
+            System.err.println("Error en resumenDelDia: " + e.getMessage());
             e.printStackTrace();
         } finally {
             if (conn != null) {
@@ -66,13 +67,13 @@ public class VentaDAO {
         Connection conn = null;
         try {
             conn = Conexion.conectar();
-            // ✅ FIX: agregado d.producto_tipo al GROUP BY
+
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT d.nombre, SUM(d.cantidad) as total FROM ventas v "
                     + "JOIN detalle_ventas d ON v.id = d.venta_id "
-                    + "WHERE v.fecha = ?::date AND v.tipo_pago != 'PENDIENTE' "
+                    + "WHERE v.fecha = ? AND v.tipo_pago != 'PENDIENTE' "
                     + "GROUP BY d.nombre, d.producto_tipo ORDER BY d.producto_tipo, d.nombre")) {
-                ps.setString(1, fecha);
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 while (rs.next()) {
                     resumen.put(rs.getString("nombre"), rs.getInt("total"));
@@ -80,8 +81,8 @@ public class VentaDAO {
             }
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT nombre, SUM(cantidad) as total FROM ventas_rapidas "
-                    + "WHERE fecha = ?::date GROUP BY nombre ORDER BY nombre")) {
-                ps.setString(1, fecha);
+                    + "WHERE fecha = ? GROUP BY nombre ORDER BY nombre")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 while (rs.next()) {
                     resumen.merge(rs.getString("nombre"), rs.getInt("total"), Integer::sum);
@@ -104,8 +105,8 @@ public class VentaDAO {
             conn = Conexion.conectar();
             PreparedStatement stmt = conn.prepareStatement(
                     "SELECT nombre, SUM(cantidad) as total FROM ventas_rapidas "
-                    + "WHERE fecha = ?::date GROUP BY nombre ORDER BY nombre");
-            stmt.setString(1, hoy());
+                    + "WHERE fecha = ? GROUP BY nombre ORDER BY nombre");
+            stmt.setDate(1, java.sql.Date.valueOf(hoy()));
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
                 resumen.put(rs.getString("nombre"), rs.getInt("total"));
@@ -113,7 +114,7 @@ public class VentaDAO {
             rs.close();
             stmt.close();
         } catch (SQLException e) {
-            System.err.println("❌ Error en resumenRapidoDelDia: " + e.getMessage());
+            System.err.println("Error en resumenRapidoDelDia: " + e.getMessage());
             e.printStackTrace();
         } finally {
             if (conn != null) {
@@ -135,23 +136,23 @@ public class VentaDAO {
         try {
             conn = Conexion.conectar();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM ventas WHERE fecha = ?::date AND tipo_pago != 'PENDIENTE'")) {
-                ps.setString(1, hoy());
+                    "SELECT COUNT(*) FROM ventas WHERE fecha = ? AND tipo_pago != 'PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(LocalDate.now()));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     ventas += rs.getInt(1);
                 }
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha = ?::date AND grupo_venta_id IS NULL")) {
-                ps.setString(1, hoy());
+                    "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha = ? AND grupo_venta_id IS NULL")) {
+                ps.setDate(1, java.sql.Date.valueOf(LocalDate.now()));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     ventas += rs.getInt(1);
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ Error en contarVentasDelDia: " + e.getMessage());
+            System.err.println("Error en contarVentasDelDia: " + e.getMessage());
             e.printStackTrace();
         } finally {
             if (conn != null) {
@@ -168,23 +169,23 @@ public class VentaDAO {
         try {
             conn = Conexion.conectar();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM ventas WHERE fecha = ?::date AND tipo_pago != 'PENDIENTE'")) {
-                ps.setString(1, fecha);
+                    "SELECT COUNT(*) FROM ventas WHERE fecha = ? AND tipo_pago != 'PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     ventas += rs.getInt(1);
                 }
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha = ?::date AND grupo_venta_id IS NULL")) {
-                ps.setString(1, fecha);
+                    "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha = ? AND grupo_venta_id IS NULL")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     ventas += rs.getInt(1);
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ Error en contarVentasDelDia(fecha): " + e.getMessage());
+            System.err.println("Error en contarVentasDelDia(fecha): " + e.getMessage());
             e.printStackTrace();
         } finally {
             if (conn != null) {
@@ -248,9 +249,9 @@ public class VentaDAO {
             int ventaId = -1;
             if (!items.isEmpty()) {
                 try (PreparedStatement psVenta = conn.prepareStatement(
-                        "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) VALUES (?::date, ?, ?, ?)",
+                        "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) VALUES (?, ?, ?, ?)",
                         Statement.RETURN_GENERATED_KEYS)) {
-                    psVenta.setString(1, hoy());
+                    psVenta.setDate(1, java.sql.Date.valueOf(java.time.LocalDate.now()));
                     psVenta.setDouble(2, totalVenta);
                     psVenta.setString(3, tipoPago);
                     psVenta.setString(4, nombreCliente);
@@ -293,8 +294,8 @@ public class VentaDAO {
                 for (String key : rapidosCant.keySet()) {
                     try (PreparedStatement psR = conn.prepareStatement(
                             "INSERT INTO ventas_rapidas (fecha, nombre, cantidad, precio_unitario, subtotal, tipo_pago, grupo_venta_id) "
-                            + "VALUES (?::date, ?, ?, ?, ?, ?, ?)")) {
-                        psR.setString(1, hoy());
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+                        psR.setDate(1, java.sql.Date.valueOf(java.time.LocalDate.now()));
                         psR.setString(2, rapidosNombres.get(key));
                         psR.setInt(3, rapidosCant.get(key));
                         psR.setDouble(4, rapidosPrecios.get(key));
@@ -332,7 +333,7 @@ public class VentaDAO {
                     Conexion.devolver(conn);
                 }
             } catch (SQLException e) {
-                System.err.println("❌ Error reseteando AutoCommit: " + e.getMessage());
+                System.err.println("Error reseteando AutoCommit: " + e.getMessage());
             }
         }
     }
@@ -349,10 +350,10 @@ public class VentaDAO {
 
             // crear venta
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) VALUES (?::date, ?, ?, 'Venta rápida')",
+                    "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) VALUES (?, ?, ?, 'Venta rápida')",
                     Statement.RETURN_GENERATED_KEYS)) {
 
-                ps.setString(1, hoy());
+                ps.setDate(1, java.sql.Date.valueOf(java.time.LocalDate.now()));
                 ps.setDouble(2, total);
                 ps.setString(3, tipoPago);
 
@@ -366,9 +367,9 @@ public class VentaDAO {
             // crear detalle
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO ventas_rapidas (fecha, nombre, cantidad, precio_unitario, subtotal, tipo_pago, grupo_venta_id) "
-                    + "VALUES (?::date, ?, ?, ?, ?, ?, ?)")) {
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
 
-                ps.setString(1, hoy());
+                ps.setDate(1, java.sql.Date.valueOf(java.time.LocalDate.now()));
                 ps.setString(2, nombre);
                 ps.setInt(3, cantidad);
                 ps.setDouble(4, precioUnitario);
@@ -380,11 +381,29 @@ public class VentaDAO {
             }
 
             conn.commit();
+            Conexion.invalidateCache(CACHE_PREFIX);
             return ventaId;
 
         } catch (Exception e) {
             e.printStackTrace();
+            try {
+                if (conn != null) {
+                    conn.rollback();
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
             return 0;
+
+        } finally {
+            try {
+                if (conn != null) {
+                    conn.setAutoCommit(true);
+                    Conexion.devolver(conn);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -403,10 +422,9 @@ public class VentaDAO {
             conn = Conexion.conectar();
             conn.setAutoCommit(false);
 
-            // ✅ FIX: cast a ::date para comparar DATE con String
             try (PreparedStatement psCheck = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM reportes WHERE fecha = ?::date")) {
-                psCheck.setString(1, fecha);
+                    "SELECT COUNT(*) FROM reportes WHERE fecha = ?")) {
+                psCheck.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rsCheck = psCheck.executeQuery();
                 if (rsCheck.next() && rsCheck.getInt(1) > 0) {
                     conn.rollback();
@@ -420,8 +438,8 @@ public class VentaDAO {
                     + "COALESCE(SUM(CASE WHEN v.tipo_pago='EFECTIVO' THEN d.subtotal ELSE 0 END),0), "
                     + "COALESCE(SUM(CASE WHEN v.tipo_pago='TRANSFERENCIA' THEN d.subtotal ELSE 0 END),0) "
                     + "FROM detalle_ventas d JOIN ventas v ON d.venta_id=v.id "
-                    + "WHERE v.fecha=?::date AND LOWER(d.producto_tipo) LIKE '%empanada%' AND v.tipo_pago!='PENDIENTE'")) {
-                ps.setString(1, fecha);
+                    + "WHERE v.fecha=? AND LOWER(d.producto_tipo) LIKE '%empanada%' AND v.tipo_pago!='PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     totalEmp = rs.getDouble(1);
@@ -435,9 +453,9 @@ public class VentaDAO {
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT d.nombre, SUM(d.cantidad) as total_cant "
                     + "FROM detalle_ventas d JOIN ventas v ON d.venta_id=v.id "
-                    + "WHERE v.fecha=?::date AND LOWER(d.producto_tipo) LIKE '%empanada%' AND v.tipo_pago!='PENDIENTE' "
+                    + "WHERE v.fecha=? AND LOWER(d.producto_tipo) LIKE '%empanada%' AND v.tipo_pago!='PENDIENTE' "
                     + "GROUP BY d.nombre ORDER BY total_cant DESC")) {
-                ps.setString(1, fecha);
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 while (rs.next()) {
                     String nombre = rs.getString("nombre");
@@ -451,32 +469,32 @@ public class VentaDAO {
 
             int conteoWeb = 0, conteoLocal = 0;
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM pedidos WHERE DATE(fecha_hora)=?::date AND UPPER(origen)='WEB'")) {
-                ps.setString(1, fecha);
+                    "SELECT COUNT(*) FROM pedidos WHERE DATE(fecha_hora)=? AND UPPER(origen)='WEB'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     conteoWeb = rs.getInt(1);
                 }
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM pedidos WHERE DATE(fecha_hora)=?::date AND UPPER(origen)='LOCAL'")) {
-                ps.setString(1, fecha);
+                    "SELECT COUNT(*) FROM pedidos WHERE DATE(fecha_hora)=? AND UPPER(origen)='LOCAL'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     conteoLocal = rs.getInt(1);
                 }
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM ventas WHERE fecha=?::date AND tipo_pago!='PENDIENTE'")) {
-                ps.setString(1, fecha);
+                    "SELECT COUNT(*) FROM ventas WHERE fecha=? AND tipo_pago!='PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     conteoLocal += rs.getInt(1);
                 }
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha=?::date AND grupo_venta_id IS NULL")) {
-                ps.setString(1, fecha);
+                    "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha=? AND grupo_venta_id IS NULL")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     conteoLocal += rs.getInt(1);
@@ -491,8 +509,8 @@ public class VentaDAO {
             double totalSopa = 0;
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COALESCE(SUM(d.subtotal),0) FROM detalle_ventas d JOIN ventas v ON d.venta_id=v.id "
-                    + "WHERE v.fecha=?::date AND LOWER(d.producto_tipo) LIKE '%sopaipilla%' AND v.tipo_pago!='PENDIENTE'")) {
-                ps.setString(1, fecha);
+                    + "WHERE v.fecha=? AND LOWER(d.producto_tipo) LIKE '%sopaipilla%' AND v.tipo_pago!='PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     totalSopa = rs.getDouble(1);
@@ -502,8 +520,8 @@ public class VentaDAO {
             double totalRapido = 0;
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COALESCE(SUM(subtotal),0), COALESCE(SUM(precio_unitario*cantidad),0) "
-                    + "FROM ventas_rapidas WHERE fecha=?::date")) {
-                ps.setString(1, fecha);
+                    + "FROM ventas_rapidas WHERE fecha=? ")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     totalRapido = Math.max(rs.getDouble(1), rs.getDouble(2));
@@ -517,8 +535,8 @@ public class VentaDAO {
             try (PreparedStatement psR = conn.prepareStatement(
                     "INSERT INTO reportes (fecha, total, total_efectivo, total_transferencia, "
                     + "total_pendiente, detalle, pedidos_web, pedidos_local, generado_por, detalle_categorias) "
-                    + "VALUES (?::date,?,?,?,?,?,?,?,?,?)")) {
-                psR.setString(1, fecha);
+                    + "VALUES (?,?,?,?,?,?,?,?,?,?)")) {
+                psR.setDate(1, java.sql.Date.valueOf(fecha));
                 psR.setDouble(2, total);
                 psR.setDouble(3, totalEfectivo);
                 psR.setDouble(4, totalTransferencia);
@@ -534,8 +552,8 @@ public class VentaDAO {
             if (totalEmp > 0) {
                 try (PreparedStatement psEmp = conn.prepareStatement(
                         "INSERT INTO reportes_empanadas (fecha, total, total_efectivo, total_transferencia, detalle, empanada_mas_vendida) "
-                        + "VALUES (?::date,?,?,?,?,?)")) {
-                    psEmp.setString(1, fecha);
+                        + "VALUES (?,?,?,?,?,?)")) {
+                    psEmp.setDate(1, java.sql.Date.valueOf(fecha));
                     psEmp.setDouble(2, totalEmp);
                     psEmp.setDouble(3, efecEmp);
                     psEmp.setDouble(4, transfEmp);
@@ -552,8 +570,8 @@ public class VentaDAO {
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COALESCE(SUM(CASE WHEN tipo_pago='EFECTIVO' THEN subtotal ELSE 0 END),0), "
                     + "COALESCE(SUM(CASE WHEN tipo_pago='TRANSFERENCIA' THEN subtotal ELSE 0 END),0) "
-                    + "FROM ventas_rapidas WHERE fecha=?::date")) {
-                ps.setString(1, fecha);
+                    + "FROM ventas_rapidas WHERE fecha=? ")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     totalRapEfec = rs.getDouble(1);
@@ -563,9 +581,9 @@ public class VentaDAO {
 
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT nombre, SUM(cantidad) as total_cant "
-                    + "FROM ventas_rapidas WHERE fecha=?::date "
+                    + "FROM ventas_rapidas WHERE fecha=? "
                     + "GROUP BY nombre ORDER BY total_cant DESC")) {
-                ps.setString(1, fecha);
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 while (rs.next()) {
                     String nombre = rs.getString("nombre");
@@ -581,8 +599,8 @@ public class VentaDAO {
                 try (PreparedStatement psRap = conn.prepareStatement(
                         "INSERT INTO reportes_rapidos (fecha, total, total_efectivo, "
                         + "total_transferencia, detalle, producto_mas_vendido) "
-                        + "VALUES (?::date,?,?,?,?,?)")) {
-                    psRap.setString(1, fecha);
+                        + "VALUES (?,?,?,?,?,?)")) {
+                    psRap.setDate(1, java.sql.Date.valueOf(fecha));
                     psRap.setDouble(2, totalRapido);
                     psRap.setDouble(3, totalRapEfec);
                     psRap.setDouble(4, totalRapTransf);
@@ -592,21 +610,20 @@ public class VentaDAO {
                 }
             }
 
-            // Limpieza de ventas del día cerrado
             try (PreparedStatement ps = conn.prepareStatement(
                     "DELETE FROM detalle_ventas WHERE venta_id IN "
-                    + "(SELECT id FROM ventas WHERE fecha=?::date AND tipo_pago!='PENDIENTE')")) {
-                ps.setString(1, fecha);
+                    + "(SELECT id FROM ventas WHERE fecha=? AND tipo_pago!='PENDIENTE')")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ps.executeUpdate();
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "DELETE FROM ventas WHERE fecha=?::date AND tipo_pago!='PENDIENTE'")) {
-                ps.setString(1, fecha);
+                    "DELETE FROM ventas WHERE fecha=? AND tipo_pago!='PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ps.executeUpdate();
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "DELETE FROM ventas_rapidas WHERE fecha=?::date")) {
-                ps.setString(1, fecha);
+                    "DELETE FROM ventas_rapidas WHERE fecha=?")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ps.executeUpdate();
             }
 
@@ -615,7 +632,7 @@ public class VentaDAO {
             return 1;
 
         } catch (SQLException e) {
-            System.err.println("❌ Error en guardarReporteYReiniciar: " + e.getMessage());
+            System.err.println("Error en guardarReporteYReiniciar: " + e.getMessage());
             e.printStackTrace();
             try {
                 if (conn != null) {
@@ -632,7 +649,7 @@ public class VentaDAO {
                     Conexion.devolver(conn);
                 }
             } catch (SQLException e) {
-                System.err.println("❌ Error reseteando AutoCommit: " + e.getMessage());
+                System.err.println("Error reseteando AutoCommit: " + e.getMessage());
             }
         }
     }
@@ -683,7 +700,7 @@ public class VentaDAO {
         try {
             conn = Conexion.conectar();
             PreparedStatement stmt = conn.prepareStatement(sql);
-            stmt.setString(1, param);
+            stmt.setDate(1, java.sql.Date.valueOf(param));
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 double result = rs.getDouble(1);
@@ -692,7 +709,7 @@ public class VentaDAO {
                 return result;
             }
         } catch (SQLException e) {
-            System.err.println("❌ Error en queryDouble: " + e.getMessage());
+            System.err.println("Error en queryDouble: " + e.getMessage());
             e.printStackTrace();
         } finally {
             if (conn != null) {
@@ -703,22 +720,24 @@ public class VentaDAO {
     }
 
     public java.time.LocalDate fechaConVentasSinCierre() {
-        String hoy = hoy();
+        String fechahoy = hoy();
         java.time.LocalDate fechaVentas = null, fechaRapidas = null;
         Connection conn = null;
         try {
             conn = Conexion.conectar();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT MIN(fecha) FROM ventas WHERE fecha < ?::date AND tipo_pago != 'PENDIENTE'")) {
-                ps.setString(1, hoy);
+                    "SELECT MIN(fecha) FROM ventas WHERE fecha < ? AND tipo_pago != 'PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fechahoy));
+
                 ResultSet rs = ps.executeQuery();
                 if (rs.next() && rs.getString(1) != null) {
                     fechaVentas = java.time.LocalDate.parse(rs.getString(1));
                 }
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT MIN(fecha) FROM ventas_rapidas WHERE fecha < ?::date")) {
-                ps.setString(1, hoy);
+                    "SELECT MIN(fecha) FROM ventas_rapidas WHERE fecha < ?")) {
+                ps.setDate(1, java.sql.Date.valueOf(fechahoy));
+
                 ResultSet rs = ps.executeQuery();
                 if (rs.next() && rs.getString(1) != null) {
                     fechaRapidas = java.time.LocalDate.parse(rs.getString(1));
@@ -751,8 +770,8 @@ public class VentaDAO {
             conn = Conexion.conectar();
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COALESCE(SUM(d.cantidad),0) FROM detalle_ventas d JOIN ventas v ON d.venta_id=v.id "
-                    + "WHERE v.fecha=?::date AND LOWER(d.producto_tipo) LIKE '%empanada%' AND v.tipo_pago!='PENDIENTE'")) {
-                ps.setString(1, fecha);
+                    + "WHERE v.fecha=? AND LOWER(d.producto_tipo) LIKE '%empanada%' AND v.tipo_pago!='PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     totales[0] = rs.getInt(1);
@@ -760,16 +779,16 @@ public class VentaDAO {
             }
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COALESCE(SUM(d.cantidad),0) FROM detalle_ventas d JOIN ventas v ON d.venta_id=v.id "
-                    + "WHERE v.fecha=?::date AND LOWER(d.producto_tipo) LIKE '%sopaipilla%' AND v.tipo_pago!='PENDIENTE'")) {
-                ps.setString(1, fecha);
+                    + "WHERE v.fecha=? AND LOWER(d.producto_tipo) LIKE '%sopaipilla%' AND v.tipo_pago!='PENDIENTE'")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     totales[1] = rs.getInt(1);
                 }
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COALESCE(SUM(cantidad),0) FROM ventas_rapidas WHERE fecha=?::date")) {
-                ps.setString(1, fecha);
+                    "SELECT COALESCE(SUM(cantidad),0) FROM ventas_rapidas WHERE fecha=?")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     totales[2] = rs.getInt(1);
