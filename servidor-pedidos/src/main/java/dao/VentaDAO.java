@@ -318,7 +318,9 @@ public class VentaDAO {
             System.err.println("Error registrando venta: " + e.getMessage());
             e.printStackTrace();
             try {
-                if (conn != null) conn.rollback();
+                if (conn != null) {
+                    conn.rollback();
+                }
             } catch (SQLException e2) {
                 e2.printStackTrace();
             }
@@ -335,31 +337,54 @@ public class VentaDAO {
         }
     }
 
-    public boolean registrarVentaRapida(String nombre, int cantidad, double precioUnitario, String tipoPago) {
+    public int registrarVentaRapida(String nombre, int cantidad, double precioUnitario, String tipoPago) {
         Connection conn = null;
         try {
             conn = Conexion.conectar();
+            conn.setAutoCommit(false);
+
+            double total = precioUnitario * cantidad;
+
+            int ventaId;
+
+            // crear venta
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) VALUES (?::date, ?, ?, 'Venta rápida')",
+                    Statement.RETURN_GENERATED_KEYS)) {
+
+                ps.setString(1, hoy());
+                ps.setDouble(2, total);
+                ps.setString(3, tipoPago);
+
+                ps.executeUpdate();
+
+                ResultSet rs = ps.getGeneratedKeys();
+                rs.next();
+                ventaId = rs.getInt(1);
+            }
+
+            // crear detalle
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO ventas_rapidas (fecha, nombre, cantidad, precio_unitario, subtotal, tipo_pago, grupo_venta_id) "
-                    + "VALUES (?::date, ?, ?, ?, ?, ?, NULL)")) {
+                    + "VALUES (?::date, ?, ?, ?, ?, ?, ?)")) {
+
                 ps.setString(1, hoy());
                 ps.setString(2, nombre);
                 ps.setInt(3, cantidad);
                 ps.setDouble(4, precioUnitario);
-                ps.setDouble(5, precioUnitario * cantidad);
+                ps.setDouble(5, total);
                 ps.setString(6, tipoPago);
-                int filas = ps.executeUpdate();
-                Conexion.invalidateCache(CACHE_PREFIX);
-                return filas > 0;
+                ps.setInt(7, ventaId);
+
+                ps.executeUpdate();
             }
-        } catch (SQLException e) {
-            System.err.println("❌ Error en registrarVentaRapida: " + e.getMessage());
+
+            conn.commit();
+            return ventaId;
+
+        } catch (Exception e) {
             e.printStackTrace();
-            return false;
-        } finally {
-            if (conn != null) {
-                Conexion.devolver(conn);
-            }
+            return 0;
         }
     }
 
@@ -417,7 +442,9 @@ public class VentaDAO {
                 while (rs.next()) {
                     String nombre = rs.getString("nombre");
                     int cant = rs.getInt("total_cant");
-                    if (masVendida == null) masVendida = nombre;
+                    if (masVendida == null) {
+                        masVendida = nombre;
+                    }
                     detalleEmp.append(nombre).append(": ").append(cant).append(" uds. | ");
                 }
             }
@@ -427,25 +454,33 @@ public class VentaDAO {
                     "SELECT COUNT(*) FROM pedidos WHERE DATE(fecha_hora)=?::date AND UPPER(origen)='WEB'")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) conteoWeb = rs.getInt(1);
+                if (rs.next()) {
+                    conteoWeb = rs.getInt(1);
+                }
             }
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COUNT(*) FROM pedidos WHERE DATE(fecha_hora)=?::date AND UPPER(origen)='LOCAL'")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) conteoLocal = rs.getInt(1);
+                if (rs.next()) {
+                    conteoLocal = rs.getInt(1);
+                }
             }
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COUNT(*) FROM ventas WHERE fecha=?::date AND tipo_pago!='PENDIENTE'")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) conteoLocal += rs.getInt(1);
+                if (rs.next()) {
+                    conteoLocal += rs.getInt(1);
+                }
             }
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha=?::date AND grupo_venta_id IS NULL")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) conteoLocal += rs.getInt(1);
+                if (rs.next()) {
+                    conteoLocal += rs.getInt(1);
+                }
             }
 
             StringBuilder detalle = new StringBuilder();
@@ -459,7 +494,9 @@ public class VentaDAO {
                     + "WHERE v.fecha=?::date AND LOWER(d.producto_tipo) LIKE '%sopaipilla%' AND v.tipo_pago!='PENDIENTE'")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) totalSopa = rs.getDouble(1);
+                if (rs.next()) {
+                    totalSopa = rs.getDouble(1);
+                }
             }
 
             double totalRapido = 0;
@@ -468,7 +505,9 @@ public class VentaDAO {
                     + "FROM ventas_rapidas WHERE fecha=?::date")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) totalRapido = Math.max(rs.getDouble(1), rs.getDouble(2));
+                if (rs.next()) {
+                    totalRapido = Math.max(rs.getDouble(1), rs.getDouble(2));
+                }
             }
 
             String detalleCategorias = "EMPANADAS:" + (long) totalEmp
@@ -531,7 +570,9 @@ public class VentaDAO {
                 while (rs.next()) {
                     String nombre = rs.getString("nombre");
                     int cant = rs.getInt("total_cant");
-                    if (masVendidoRap == null) masVendidoRap = nombre;
+                    if (masVendidoRap == null) {
+                        masVendidoRap = nombre;
+                    }
                     detalleRap.append(nombre).append(": ").append(cant).append(" uds. | ");
                 }
             }
@@ -577,7 +618,9 @@ public class VentaDAO {
             System.err.println("❌ Error en guardarReporteYReiniciar: " + e.getMessage());
             e.printStackTrace();
             try {
-                if (conn != null) conn.rollback();
+                if (conn != null) {
+                    conn.rollback();
+                }
             } catch (SQLException e2) {
                 e2.printStackTrace();
             }
@@ -688,8 +731,12 @@ public class VentaDAO {
                 Conexion.devolver(conn);
             }
         }
-        if (fechaVentas == null) return fechaRapidas;
-        if (fechaRapidas == null) return fechaVentas;
+        if (fechaVentas == null) {
+            return fechaRapidas;
+        }
+        if (fechaRapidas == null) {
+            return fechaVentas;
+        }
         return fechaVentas.isBefore(fechaRapidas) ? fechaVentas : fechaRapidas;
     }
 
@@ -707,20 +754,26 @@ public class VentaDAO {
                     + "WHERE v.fecha=?::date AND LOWER(d.producto_tipo) LIKE '%empanada%' AND v.tipo_pago!='PENDIENTE'")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) totales[0] = rs.getInt(1);
+                if (rs.next()) {
+                    totales[0] = rs.getInt(1);
+                }
             }
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COALESCE(SUM(d.cantidad),0) FROM detalle_ventas d JOIN ventas v ON d.venta_id=v.id "
                     + "WHERE v.fecha=?::date AND LOWER(d.producto_tipo) LIKE '%sopaipilla%' AND v.tipo_pago!='PENDIENTE'")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) totales[1] = rs.getInt(1);
+                if (rs.next()) {
+                    totales[1] = rs.getInt(1);
+                }
             }
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COALESCE(SUM(cantidad),0) FROM ventas_rapidas WHERE fecha=?::date")) {
                 ps.setString(1, fecha);
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) totales[2] = rs.getInt(1);
+                if (rs.next()) {
+                    totales[2] = rs.getInt(1);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -733,7 +786,9 @@ public class VentaDAO {
     }
 
     private boolean esCategoriRapida(String cat) {
-        if (cat == null) return false;
+        if (cat == null) {
+            return false;
+        }
         String normalizada = java.text.Normalizer
                 .normalize(cat, java.text.Normalizer.Form.NFD)
                 .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
