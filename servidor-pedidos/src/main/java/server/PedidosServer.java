@@ -1,6 +1,5 @@
 package server;
 
-import server.StockDescontador;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dao.PedidosDAO;
@@ -77,7 +76,6 @@ public class PedidosServer {
                     int id = resultado[0];
                     int numeroPedido = resultado[1];
 
-                    StockDescontador.descontarDesdeDetalle(detalle);
                     registrarVentaDesdeWeb(body, tipoPago, cliente);
 
                     String respuesta = "{"
