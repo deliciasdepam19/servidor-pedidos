@@ -220,14 +220,22 @@ public class PedidosServer {
             }
         }
 
-        int inicioMin = (minuto < 30) ? 0 : 30;
-        int finMin = (inicioMin == 0) ? 30 : 60;
+        int inicioMin;
+        int horaInicio;
 
-        int horaFin = (finMin == 60) ? hora + 1 : hora;
-        finMin = (finMin == 60) ? 0 : finMin;
+        if (minuto < 30) {
+            inicioMin = 30;
+            horaInicio = hora;
+        } else {
+            inicioMin = 0;
+            horaInicio = hora + 1;
+        }
+
+        int finMin = (inicioMin == 30) ? 0 : 30;
+        int horaFin = (inicioMin == 30) ? horaInicio + 1 : horaInicio;
 
         return String.format("%02d:%02d - %02d:%02d",
-                hora, inicioMin,
+                horaInicio, inicioMin,
                 horaFin, finMin);
     }
 
