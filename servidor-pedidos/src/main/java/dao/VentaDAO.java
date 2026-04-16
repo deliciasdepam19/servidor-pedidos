@@ -66,6 +66,7 @@ public class VentaDAO {
         return PendientesDAO.totalPendientePorFecha(fecha);
     }
 
+
     public Map<String, Integer> resumenDelDia() {
         return resumenDelDia(hoy());
     }
@@ -272,7 +273,7 @@ public class VentaDAO {
 
             int ventaId = -1;
             java.sql.Date hoy = java.sql.Date.valueOf(java.time.LocalDate.now());
-
+            
             if (!items.isEmpty()) {
                 try (PreparedStatement psVenta = conn.prepareStatement(
                         "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) VALUES (?, ?, ?, ?)",
@@ -339,10 +340,10 @@ public class VentaDAO {
                         psR.setInt(3, cantidad);
                         psR.setDouble(4, precioUnit);
                         psR.setDouble(5, precioUnit * cantidad);
-                        psR.setString(6, tipoPago);
+                        psR.setString(6, tipoPago);  
 
                         if (ventaId > 0) {
-                            psR.setInt(7, ventaId);
+                            psR.setInt(7, ventaId);   
                         } else {
                             psR.setNull(7, Types.INTEGER);
                         }
@@ -419,6 +420,166 @@ public class VentaDAO {
         }
 
         return fechaVentas.isBefore(fechaRapidas) ? fechaVentas : fechaRapidas;
+    }
+
+    public int[] resumenCategorias(String fecha) {
+        int[] result = {0, 0, 0};
+        Connection conn = null;
+
+        try {
+            conn = Conexion.conectar();
+            java.sql.Date sqlFecha = java.sql.Date.valueOf(fecha);
+
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT d.producto_tipo, SUM(d.cantidad) as total "
+                    + "FROM ventas v "
+                    + "JOIN detalle_ventas d ON v.id = d.venta_id "
+                    + "WHERE v.fecha = ? AND v.tipo_pago != 'PENDIENTE' "
+                    + "GROUP BY d.producto_tipo")) {
+
+                ps.setDate(1, sqlFecha);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String tipo = rs.getString("producto_tipo");
+                        int total = rs.getInt("total");
+                        if (tipo != null) {
+                            String t = tipo.toLowerCase().trim();
+                            if (t.contains("empanada")) {
+                                result[0] += total;
+                            } else if (t.contains("sopaipilla")) {
+                                result[1] += total;
+                            }
+                        }
+                    }
+                }
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COALESCE(SUM(cantidad), 0) FROM ventas_rapidas WHERE fecha = ?")) {
+
+                ps.setDate(1, sqlFecha);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        result[2] = rs.getInt(1);
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error en resumenCategorias: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            cerrarConexion(conn);
+        }
+
+        return result;
+    }
+
+    public int guardarReporteYReiniciar(
+            double total,
+            double totalEfectivo,
+            double totalTransferencia,
+            Map<String, Integer> resumen,
+            String usuario,
+            String fecha) {
+
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            conn.setAutoCommit(false);
+
+            try (PreparedStatement psCheck = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM reportes_diarios WHERE fecha = ?")) {
+
+                psCheck.setDate(1, java.sql.Date.valueOf(fecha));
+
+                try (ResultSet rs = psCheck.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        return 0; 
+                    }
+                }
+            }
+
+            try (PreparedStatement psReporte = conn.prepareStatement(
+                    "INSERT INTO reportes_diarios (fecha, total, total_efectivo, total_transferencia, usuario) "
+                    + "VALUES (?, ?, ?, ?, ?)")) {
+
+                psReporte.setDate(1, java.sql.Date.valueOf(fecha));
+                psReporte.setDouble(2, total);
+                psReporte.setDouble(3, totalEfectivo);
+                psReporte.setDouble(4, totalTransferencia);
+                psReporte.setString(5, usuario);
+                psReporte.executeUpdate();
+            }
+
+            try (PreparedStatement psDel1 = conn.prepareStatement(
+                    "DELETE FROM detalle_ventas WHERE venta_id IN "
+                    + "(SELECT id FROM ventas WHERE fecha = ?)")) {
+
+                psDel1.setDate(1, java.sql.Date.valueOf(fecha));
+                psDel1.executeUpdate();
+            }
+
+            try (PreparedStatement psDel2 = conn.prepareStatement(
+                    "DELETE FROM ventas WHERE fecha = ?")) {
+
+                psDel2.setDate(1, java.sql.Date.valueOf(fecha));
+                psDel2.executeUpdate();
+            }
+
+            try (PreparedStatement psDel3 = conn.prepareStatement(
+                    "DELETE FROM ventas_rapidas WHERE fecha = ?")) {
+
+                psDel3.setDate(1, java.sql.Date.valueOf(fecha));
+                psDel3.executeUpdate();
+            }
+
+            conn.commit();
+            Conexion.invalidateCache(CACHE_PREFIX);
+            return 1;
+
+        } catch (SQLException e) {
+            System.err.println("Error en guardarReporteYReiniciar: " + e.getMessage());
+            e.printStackTrace();
+            try {
+                if (conn != null) conn.rollback();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+            return -1;
+        } finally {
+            cerrarConexion(conn);
+        }
+    }
+
+    public boolean registrarVentaDesdeCarrita(
+            Map<String, Integer> carrito,
+            Map<String, String> categorias,
+            Map<String, String> nombres,
+            Map<String, Double> precios,
+            Map<String, Integer> ids,
+            String tipoPago,
+            String nombreCliente) {
+        
+        Map<Integer, Integer> items = new java.util.LinkedHashMap<>();
+        Map<Integer, String> categoriasById = new java.util.LinkedHashMap<>();
+        Map<Integer, String> nombresById = new java.util.LinkedHashMap<>();
+        Map<Integer, Double> preciosById = new java.util.LinkedHashMap<>();
+
+        for (Map.Entry<String, Integer> entry : carrito.entrySet()) {
+            String key = entry.getKey();
+            Integer id = ids.get(key);
+            if (id == null) continue;
+
+            items.put(id, entry.getValue());
+            categoriasById.put(id, categorias.get(key));
+            nombresById.put(id, nombres.get(key));
+            preciosById.put(id, precios.get(key));
+        }
+
+        return registrarVenta(items, categoriasById, nombresById, preciosById, tipoPago, nombreCliente);
     }
 
     private String hoy() {
