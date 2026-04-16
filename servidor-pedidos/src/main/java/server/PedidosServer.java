@@ -56,6 +56,7 @@ public class PedidosServer {
                     System.out.println("INSERTANDO PEDIDO: " + cliente + " - " + System.currentTimeMillis());
 
                     String franja = calcularFranjaActual(detalle);
+                    System.out.println("FRANJA CALCULADA: " + franja);
 
                     if ("FUERA HORARIO".equals(franja)) {
                         enviarRespuesta(exchange, 403,
@@ -210,16 +211,6 @@ public class PedidosServer {
                     || d.contains("marraqueta");
         }
 
-        if (esPanaderia) {
-            if (hora < 12 || hora >= 18) {
-                return "FUERA HORARIO";
-            }
-        } else {
-            if (hora < 18 || hora >= 22) {
-                return "FUERA HORARIO";
-            }
-        }
-
         int inicioMin;
         int horaInicio;
 
@@ -229,6 +220,16 @@ public class PedidosServer {
         } else {
             inicioMin = 0;
             horaInicio = hora + 1;
+        }
+
+        if (esPanaderia) {
+            if (horaInicio < 12 || horaInicio >= 18) {
+                return "FUERA HORARIO";
+            }
+        } else {
+            if (horaInicio < 18 || horaInicio >= 22) {
+                return "FUERA HORARIO";
+            }
         }
 
         int finMin = (inicioMin == 30) ? 0 : 30;
