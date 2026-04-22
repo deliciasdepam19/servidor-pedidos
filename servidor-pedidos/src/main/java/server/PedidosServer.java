@@ -205,53 +205,50 @@ public class PedidosServer {
         ex.close();
     }
 
-    private String calcularFranjaActual(String detalle) {
+   private String calcularFranjaActual(String detalle, String categorias) {
 
-        java.time.LocalTime ahora = java.time.LocalTime.now(
-                java.time.ZoneId.of("America/Santiago"));
+    java.time.LocalTime ahora = java.time.LocalTime.now(
+            java.time.ZoneId.of("America/Santiago"));
 
-        int hora = ahora.getHour();
-        int minuto = ahora.getMinute();
+    int hora   = ahora.getHour();
+    int minuto = ahora.getMinute();
 
-        boolean esPanaderia = false;
+    String d = detalle   != null ? detalle.toLowerCase()   : "";
+    String c = categorias != null ? categorias.toLowerCase() : "";
 
-        if (detalle != null) {
-            String d = detalle.toLowerCase();
-            esPanaderia
-                    = d.contains("panaderia")
-                    || d.contains("panadería")
-                    || d.contains("hallula")
-                    || d.contains("marraqueta");
-        }
+    boolean esPanaderia   = c.contains("panaderia") || c.contains("panadería")
+                         || d.contains("panaderia") || d.contains("panadería")
+                         || d.contains("hallula")   || d.contains("marraqueta")
+                         || d.contains("dobladita") || d.contains("pan amasado")
+                         || d.contains("pan ");
 
-        int inicioMin;
-        int horaInicio;
+    boolean esAnticipado  = c.contains("pasteler") || c.contains("reposteri")
+                         || d.contains("pasteler") || d.contains("reposteri");
 
-        if (minuto < 30) {
-            inicioMin = 30;
-            horaInicio = hora;
-        } else {
-            inicioMin = 0;
-            horaInicio = hora + 1;
-        }
+    int inicioMin;
+    int horaInicio;
 
-        if (esPanaderia) {
-            if (horaInicio < 12 || horaInicio >= 18) {
-                return "FUERA HORARIO";
-            }
-        } else {
-            if (horaInicio < 18 || horaInicio >= 22) {
-                return "FUERA HORARIO";
-            }
-        }
-
-        int finMin = (inicioMin == 30) ? 0 : 30;
-        int horaFin = (inicioMin == 30) ? horaInicio + 1 : horaInicio;
-
-        return String.format("%02d:%02d - %02d:%02d",
-                horaInicio, inicioMin,
-                horaFin, finMin);
+    if (minuto < 30) {
+        inicioMin = 30;
+        horaInicio = hora;
+    } else {
+        inicioMin = 0;
+        horaInicio = hora + 1;
     }
+
+    if (esPanaderia) {
+        if (horaInicio < 12 || horaInicio >= 18) return "FUERA HORARIO";
+    } else if (esAnticipado) {
+        if (horaInicio < 12 || horaInicio >= 22) return "FUERA HORARIO";
+    } else {
+        if (horaInicio < 18 || horaInicio >= 22) return "FUERA HORARIO";
+    }
+
+    int finMin  = (inicioMin == 30) ? 0  : 30;
+    int horaFin = (inicioMin == 30) ? horaInicio + 1 : horaInicio;
+
+    return String.format("%02d:%02d - %02d:%02d", horaInicio, inicioMin, horaFin, finMin);
+}
 
     private String obtenerHoraExacta() {
         return java.time.LocalTime.now(
