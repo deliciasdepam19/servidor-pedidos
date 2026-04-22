@@ -66,13 +66,19 @@ public class PedidosServer {
                         return;
                     }
 
+                    String fechaEntrega = extraerValor(body, "fecha_entrega");
+                    if ("-".equals(fechaEntrega) || fechaEntrega.isBlank()) {
+                        fechaEntrega = null;
+                    }
+
                     int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
                             cliente,
                             telefono,
                             detalle,
                             total,
                             franja,
-                            "WEB"
+                            "WEB",
+                            fecha_entrega
                     );
 
                     int id            = resultado[0];
