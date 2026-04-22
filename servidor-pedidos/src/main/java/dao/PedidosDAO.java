@@ -41,11 +41,12 @@ public class PedidosDAO {
     }
 
     public int[] guardarPedidoAutoNumero(String cliente, String telefono,
-            String detalle, double total, String franja, String origen) {
+            String detalle, double total, String franja, String origen,
+            String fechaEntrega) {
 
         String sqlNum = "SELECT nextval('pedidos_numero_seq')";
-        String sqlIns = "INSERT INTO pedidos (numero, cliente, telefono, detalle, total, estado, franja, origen) "
-                + "VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?, ?)";
+        String sqlIns = "INSERT INTO pedidos (numero, cliente, telefono, detalle, total, estado, franja, origen, fecha_entrega) "
+                + "VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?)";
 
         Connection conn = null;
         try {
@@ -68,6 +69,14 @@ public class PedidosDAO {
                 psIns.setDouble(5, total);
                 psIns.setString(6, franja);
                 psIns.setString(7, origen);
+                // fecha_entrega puede ser null para pedidos normales
+                if (fechaEntrega != null && !fechaEntrega.isBlank()) {
+                    psIns.setDate(8, java.sql.Date.valueOf(
+                            java.time.LocalDate.parse(fechaEntrega,
+                                    java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+                } else {
+                    psIns.setNull(8, java.sql.Types.DATE);
+                }
                 psIns.executeUpdate();
                 try (ResultSet rs = psIns.getGeneratedKeys()) {
                     if (rs.next()) {
@@ -84,8 +93,8 @@ public class PedidosDAO {
             try {
                 if (conn != null) {
                     conn.rollback();
-                }
-            } catch (SQLException ignored) {
+            
+                }} catch (SQLException ignored) {
             }
             e.printStackTrace();
         } finally {
