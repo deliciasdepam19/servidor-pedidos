@@ -78,7 +78,7 @@ public class PedidosServer {
                             total,
                             franja,
                             "WEB",
-                            fecha_entrega
+                            fechaEntrega
                     );
 
                     int id            = resultado[0];
