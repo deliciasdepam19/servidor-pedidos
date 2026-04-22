@@ -21,7 +21,7 @@ public class PedidosServer {
     private HttpServer servidor;
 
     private final Map<String, Long> ultimoPedidoPorIp = new ConcurrentHashMap<>();
-    private final Map<String, Integer> contadorPorIp = new ConcurrentHashMap<>();
+    private final Map<String, Integer> contadorPorIp  = new ConcurrentHashMap<>();
 
     public PedidosServer() throws IOException {
 
@@ -38,7 +38,7 @@ public class PedidosServer {
 
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
-                    String body = readBody(exchange);
+                    String body    = readBody(exchange);
                     String cliente  = sanitizar(extraerValor(body, "cliente"));
                     String telefono = sanitizar(extraerValor(body, "telefono"));
                     String detalle  = sanitizar(extraerValor(body, "detalle"));
@@ -67,21 +67,14 @@ public class PedidosServer {
                     }
 
                     int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
-                            cliente,
-                            telefono,
-                            detalle,
-                            total,
-                            franja,
-                            "WEB",
-                            fechaEntrega
-                    );
+                            cliente, telefono, detalle, total, franja, "WEB", fechaEntrega);
 
-                    int id            = resultado[0];
-                    int numeroPedido  = resultado[1];
+                    int id           = resultado[0];
+                    int numeroPedido = resultado[1];
 
                     String respuesta = "{"
                             + "\"exito\":true,"
-                            + "\"id\":"     + id            + ","
+                            + "\"id\":"     + id           + ","
                             + "\"numero\":" + numeroPedido
                             + "}";
 
@@ -101,19 +94,15 @@ public class PedidosServer {
             if ("GET".equals(exchange.getRequestMethod())) {
 
                 List<PedidosDAO.PedidoBD> pedidos = pedidosDAO.cargarPedidosDeHoy();
-
                 StringBuilder json = new StringBuilder("[");
 
                 for (int i = 0; i < pedidos.size(); i++) {
-
                     PedidosDAO.PedidoBD p = pedidos.get(i);
-
                     json.append("{")
                             .append("\"id\":").append(p.id).append(",")
                             .append("\"numero\":").append(p.numero).append(",")
                             .append("\"numeroFormateado\":\"")
-                            .append(PedidosDAO.formatearNumero(p.numero, p.origen))
-                            .append("\",")
+                            .append(PedidosDAO.formatearNumero(p.numero, p.origen)).append("\",")
                             .append("\"cliente\":\"").append(escaparJson(p.cliente)).append("\",")
                             .append("\"telefono\":\"").append(escaparJson(p.telefono)).append("\",")
                             .append("\"detalle\":\"").append(escaparJson(p.detalle)).append("\",")
@@ -122,10 +111,7 @@ public class PedidosServer {
                             .append("\"franja\":\"").append(p.franja).append("\",")
                             .append("\"timestamp\":\"").append(obtenerHoraExacta()).append("\"")
                             .append("}");
-
-                    if (i < pedidos.size() - 1) {
-                        json.append(",");
-                    }
+                    if (i < pedidos.size() - 1) json.append(",");
                 }
 
                 json.append("]");
@@ -157,6 +143,35 @@ public class PedidosServer {
         System.out.println("Servidor OK puerto " + PUERTO);
     }
 
+    // ── Métodos auxiliares ────────────────────────────────────────────────────
+
+    private String readBody(HttpExchange exchange) throws IOException {
+        return new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+    }
+
+    private String extraerValor(String json, String clave) {
+        String patron = "\"" + clave + "\":\"";
+        int i = json.indexOf(patron);
+        if (i == -1) return "-";
+        i += patron.length();
+        int f = json.indexOf("\"", i);
+        return f == -1 ? "-" : json.substring(i, f);
+    }
+
+    private double extraerDouble(String json, String clave) {
+        try {
+            String patron = "\"" + clave + "\":";
+            int i = json.indexOf(patron);
+            if (i == -1) return 0;
+            i += patron.length();
+            int f = json.indexOf(",", i);
+            if (f == -1) f = json.indexOf("}", i);
+            return Double.parseDouble(json.substring(i, f).trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     private String extraerCategoriasDeLosItems(String json) {
         StringBuilder cats = new StringBuilder();
         String patron = "\"categoria\":\"";
@@ -171,48 +186,42 @@ public class PedidosServer {
 
     private String calcularFranjaActual(String detalle, String categorias) {
 
-    java.time.LocalTime ahora = java.time.LocalTime.now(
-            java.time.ZoneId.of("America/Santiago"));
+        java.time.LocalTime ahora = java.time.LocalTime.now(
+                java.time.ZoneId.of("America/Santiago"));
 
-    int hora   = ahora.getHour();
-    int minuto = ahora.getMinute();
+        int hora   = ahora.getHour();
+        int minuto = ahora.getMinute();
 
-    String d = detalle    != null ? detalle.toLowerCase()    : "";
-    String c = categorias != null ? categorias.toLowerCase() : "";
+        String d = detalle    != null ? detalle.toLowerCase()    : "";
+        String c = categorias != null ? categorias.toLowerCase() : "";
 
-    boolean esPanaderia  = c.contains("panaderia") || c.contains("panadería")
-                        || d.contains("panaderia") || d.contains("panadería")
-                        || d.contains("hallula")   || d.contains("marraqueta")
-                        || d.contains("dobladita") || d.contains("pan amasado")
-                        || d.contains("pan ");
+        boolean esPanaderia  = c.contains("panaderia") || c.contains("panadería")
+                            || d.contains("panaderia") || d.contains("panadería")
+                            || d.contains("hallula")   || d.contains("marraqueta")
+                            || d.contains("dobladita") || d.contains("pan amasado")
+                            || d.contains("pan ");
 
-    boolean esAnticipado = c.contains("pasteler") || c.contains("reposteri")
-                        || d.contains("pasteler") || d.contains("reposteri");
+        boolean esAnticipado = c.contains("pasteler") || c.contains("reposteri")
+                            || d.contains("pasteler") || d.contains("reposteri");
 
-    if (esPanaderia) {
-        if (hora < 12 || hora >= 18) return "FUERA HORARIO";
-    } else if (esAnticipado) {
-        if (hora < 12 || hora >= 22) return "FUERA HORARIO";
-    } else {
-        if (hora < 18 || hora >= 22) return "FUERA HORARIO";
+        // Validar con hora actual
+        if (esPanaderia) {
+            if (hora < 12 || hora >= 18) return "FUERA HORARIO";
+        } else if (esAnticipado) {
+            if (hora < 12 || hora >= 22) return "FUERA HORARIO";
+        } else {
+            if (hora < 18 || hora >= 22) return "FUERA HORARIO";
+        }
+
+        // Calcular franja de entrega
+        int inicioMin  = (minuto < 30) ? 30 : 0;
+        int horaInicio = (minuto < 30) ? hora : hora + 1;
+        int finMin     = (inicioMin == 30) ? 0  : 30;
+        int horaFin    = (inicioMin == 30) ? horaInicio + 1 : horaInicio;
+
+        return String.format("%02d:%02d - %02d:%02d", horaInicio, inicioMin, horaFin, finMin);
     }
 
-    int inicioMin;
-    int horaInicio;
-
-    if (minuto < 30) {
-        inicioMin  = 30;
-        horaInicio = hora;
-    } else {
-        inicioMin  = 0;
-        horaInicio = hora + 1;
-    }
-
-    int finMin  = (inicioMin == 30) ? 0  : 30;
-    int horaFin = (inicioMin == 30) ? horaInicio + 1 : horaInicio;
-
-    return String.format("%02d:%02d - %02d:%02d", horaInicio, inicioMin, horaFin, finMin);
-}
     private String escaparJson(String t) {
         return t == null ? "" : t.replace("\"", "\\\"");
     }
