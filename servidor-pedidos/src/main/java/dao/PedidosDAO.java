@@ -363,7 +363,7 @@ public class PedidosDAO {
                     "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
                     + "FROM pedidos "
                     + "WHERE estado = 'PENDIENTE' "
-                    + "AND (fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE 'America/Santiago')::date = "
+                    + "AND (fecha_hora::timestamptz AT TIME ZONE 'America/Santiago')::date = "
                     + "    (CURRENT_TIMESTAMP AT TIME ZONE 'America/Santiago')::date "
                     + "ORDER BY fecha_hora ASC"
             );
