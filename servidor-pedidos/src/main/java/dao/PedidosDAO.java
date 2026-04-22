@@ -212,7 +212,6 @@ public class PedidosDAO {
         try {
             conn = Conexion.conectar();
             try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
-
                 while (rs.next()) {
                     PedidoBD pb = new PedidoBD(
                             rs.getInt("id"),
