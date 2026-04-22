@@ -93,8 +93,9 @@ public class PedidosDAO {
             try {
                 if (conn != null) {
                     conn.rollback();
-            
-                }} catch (SQLException ignored) {
+
+                }
+            } catch (SQLException ignored) {
             }
             e.printStackTrace();
         } finally {
@@ -199,9 +200,11 @@ public class PedidosDAO {
 
     public List<PedidoBD> cargarPedidosDeHoy() {
         List<PedidoBD> lista = new ArrayList<>();
-        String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, origen, fecha_hora "
+        String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, origen, "
+                + "(fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE 'America/Santiago') AS fecha_hora "
                 + "FROM pedidos "
-                + "WHERE fecha_hora::date = CURRENT_DATE "
+                + "WHERE (fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE 'America/Santiago')::date = "
+                + "      (CURRENT_TIMESTAMP AT TIME ZONE 'America/Santiago')::date "
                 + "AND estado NOT IN ('COBRADO', 'ELIMINADO') "
                 + "ORDER BY numero ASC";
 
