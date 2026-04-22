@@ -41,10 +41,10 @@ public class PedidosServer {
 
                     String body = readBody(exchange);
 
-                    String cliente = sanitizar(extraerValor(body, "cliente"));
+                    String cliente  = sanitizar(extraerValor(body, "cliente"));
                     String telefono = sanitizar(extraerValor(body, "telefono"));
-                    String detalle = sanitizar(extraerValor(body, "detalle"));
-                    double total = extraerDouble(body, "total");
+                    String detalle  = sanitizar(extraerValor(body, "detalle"));
+                    double total    = extraerDouble(body, "total");
 
                     String tipoPago = extraerValor(body, "tipoPago");
                     if ("-".equals(tipoPago) || tipoPago.isBlank()) {
@@ -53,7 +53,11 @@ public class PedidosServer {
 
                     System.out.println("INSERTANDO PEDIDO: " + cliente + " - " + System.currentTimeMillis());
 
-                    String franja = calcularFranjaActual(detalle);
+                    // ── CAMBIO 1: extraer categorías del array items ──
+                    String categorias = extraerCategoriasDeLosItems(body);
+                    System.out.println("CATEGORIAS DETECTADAS: " + categorias);
+
+                    String franja = calcularFranjaActual(detalle, categorias);
                     System.out.println("FRANJA CALCULADA: " + franja);
 
                     if ("FUERA HORARIO".equals(franja)) {
@@ -71,12 +75,12 @@ public class PedidosServer {
                             "WEB"
                     );
 
-                    int id = resultado[0];
-                    int numeroPedido = resultado[1];
+                    int id            = resultado[0];
+                    int numeroPedido  = resultado[1];
 
                     String respuesta = "{"
                             + "\"exito\":true,"
-                            + "\"id\":" + id + ","
+                            + "\"id\":"     + id            + ","
                             + "\"numero\":" + numeroPedido
                             + "}";
 
@@ -115,7 +119,7 @@ public class PedidosServer {
                             .append("\"total\":").append(p.total).append(",")
                             .append("\"estado\":\"").append(p.estado).append("\",")
                             .append("\"franja\":\"").append(p.franja).append("\",")
-                            .append("\"timestamp\":\"" + obtenerHoraExacta() + "\"")
+                            .append("\"timestamp\":\"").append(obtenerHoraExacta()).append("\"")
                             .append("}");
 
                     if (i < pedidos.size() - 1) {
@@ -139,11 +143,8 @@ public class PedidosServer {
 
             if ("GET".equals(exchange.getRequestMethod())) {
                 try {
-
                     String stock = StockDescontador.obtenerStockJSON();
-
                     enviarRespuesta(exchange, 200, stock);
-
                 } catch (Exception e) {
                     e.printStackTrace();
                     enviarRespuesta(exchange, 500, "{}");
@@ -155,6 +156,65 @@ public class PedidosServer {
         System.out.println("Servidor OK puerto " + PUERTO);
     }
 
+    // ── CAMBIO 2: nuevo método auxiliar ──────────────────────────────────────
+    private String extraerCategoriasDeLosItems(String json) {
+        StringBuilder cats = new StringBuilder();
+        String patron = "\"categoria\":\"";
+        int i = 0;
+        while ((i = json.indexOf(patron, i)) != -1) {
+            i += patron.length();
+            int f = json.indexOf("\"", i);
+            if (f != -1) cats.append(json, i, f).append(" ");
+        }
+        return cats.toString().toLowerCase();
+    }
+
+    // ── CAMBIO 3: calcularFranjaActual recibe categorias ──────────────────────
+    private String calcularFranjaActual(String detalle, String categorias) {
+
+        java.time.LocalTime ahora = java.time.LocalTime.now(
+                java.time.ZoneId.of("America/Santiago"));
+
+        int hora   = ahora.getHour();
+        int minuto = ahora.getMinute();
+
+        String d = detalle    != null ? detalle.toLowerCase()    : "";
+        String c = categorias != null ? categorias.toLowerCase() : "";
+
+        boolean esPanaderia  = c.contains("panaderia") || c.contains("panadería")
+                            || d.contains("panaderia") || d.contains("panadería")
+                            || d.contains("hallula")   || d.contains("marraqueta")
+                            || d.contains("dobladita") || d.contains("pan amasado")
+                            || d.contains("pan ");
+
+        boolean esAnticipado = c.contains("pasteler") || c.contains("reposteri")
+                            || d.contains("pasteler") || d.contains("reposteri");
+
+        int inicioMin;
+        int horaInicio;
+
+        if (minuto < 30) {
+            inicioMin  = 30;
+            horaInicio = hora;
+        } else {
+            inicioMin  = 0;
+            horaInicio = hora + 1;
+        }
+
+        if (esPanaderia) {
+            if (horaInicio < 12 || horaInicio >= 18) return "FUERA HORARIO";
+        } else if (esAnticipado) {
+            if (horaInicio < 12 || horaInicio >= 22) return "FUERA HORARIO";
+        } else {
+            if (horaInicio < 18 || horaInicio >= 22) return "FUERA HORARIO";
+        }
+
+        int finMin  = (inicioMin == 30) ? 0  : 30;
+        int horaFin = (inicioMin == 30) ? horaInicio + 1 : horaInicio;
+
+        return String.format("%02d:%02d - %02d:%02d", horaInicio, inicioMin, horaFin, finMin);
+    }
+
     private String readBody(HttpExchange exchange) throws IOException {
         return new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
     }
@@ -162,9 +222,7 @@ public class PedidosServer {
     private String extraerValor(String json, String clave) {
         String patron = "\"" + clave + "\":\"";
         int i = json.indexOf(patron);
-        if (i == -1) {
-            return "-";
-        }
+        if (i == -1) return "-";
         i += patron.length();
         int f = json.indexOf("\"", i);
         return f == -1 ? "-" : json.substring(i, f);
@@ -174,14 +232,10 @@ public class PedidosServer {
         try {
             String patron = "\"" + clave + "\":";
             int i = json.indexOf(patron);
-            if (i == -1) {
-                return 0;
-            }
+            if (i == -1) return 0;
             i += patron.length();
             int f = json.indexOf(",", i);
-            if (f == -1) {
-                f = json.indexOf("}", i);
-            }
+            if (f == -1) f = json.indexOf("}", i);
             return Double.parseDouble(json.substring(i, f));
         } catch (Exception e) {
             return 0;
@@ -204,51 +258,6 @@ public class PedidosServer {
         ex.getResponseBody().write(b);
         ex.close();
     }
-
-   private String calcularFranjaActual(String detalle, String categorias) {
-
-    java.time.LocalTime ahora = java.time.LocalTime.now(
-            java.time.ZoneId.of("America/Santiago"));
-
-    int hora   = ahora.getHour();
-    int minuto = ahora.getMinute();
-
-    String d = detalle   != null ? detalle.toLowerCase()   : "";
-    String c = categorias != null ? categorias.toLowerCase() : "";
-
-    boolean esPanaderia   = c.contains("panaderia") || c.contains("panadería")
-                         || d.contains("panaderia") || d.contains("panadería")
-                         || d.contains("hallula")   || d.contains("marraqueta")
-                         || d.contains("dobladita") || d.contains("pan amasado")
-                         || d.contains("pan ");
-
-    boolean esAnticipado  = c.contains("pasteler") || c.contains("reposteri")
-                         || d.contains("pasteler") || d.contains("reposteri");
-
-    int inicioMin;
-    int horaInicio;
-
-    if (minuto < 30) {
-        inicioMin = 30;
-        horaInicio = hora;
-    } else {
-        inicioMin = 0;
-        horaInicio = hora + 1;
-    }
-
-    if (esPanaderia) {
-        if (horaInicio < 12 || horaInicio >= 18) return "FUERA HORARIO";
-    } else if (esAnticipado) {
-        if (horaInicio < 12 || horaInicio >= 22) return "FUERA HORARIO";
-    } else {
-        if (horaInicio < 18 || horaInicio >= 22) return "FUERA HORARIO";
-    }
-
-    int finMin  = (inicioMin == 30) ? 0  : 30;
-    int horaFin = (inicioMin == 30) ? horaInicio + 1 : horaInicio;
-
-    return String.format("%02d:%02d - %02d:%02d", horaInicio, inicioMin, horaFin, finMin);
-}
 
     private String obtenerHoraExacta() {
         return java.time.LocalTime.now(
