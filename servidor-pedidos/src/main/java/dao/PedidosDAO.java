@@ -201,13 +201,11 @@ public class PedidosDAO {
     public List<PedidoBD> cargarPedidosDeHoy() {
         List<PedidoBD> lista = new ArrayList<>();
         String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, origen, "
-                + "(fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE 'America/Santiago') AS fecha_hora "
+                + "fecha_hora "
                 + "FROM pedidos "
-                + "WHERE (fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE 'America/Santiago')::date = "
-                + "      (CURRENT_TIMESTAMP AT TIME ZONE 'America/Santiago')::date "
+                + "WHERE fecha_hora::date = CURRENT_DATE "
                 + "AND estado NOT IN ('COBRADO', 'ELIMINADO') "
                 + "ORDER BY numero ASC";
-
         Connection conn = null;
         try {
             conn = Conexion.conectar();
