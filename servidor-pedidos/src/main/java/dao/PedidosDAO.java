@@ -368,8 +368,12 @@ public class PedidosDAO {
             );
 
             ResultSet rs = ps.executeQuery();
+            System.out.println("[DAO] Ejecutando query pedidos pendientes hoy...");
 
             while (rs.next()) {
+                System.out.println("[DAO] Encontrado id=" + rs.getInt("id")
+                        + " fecha_santiago=" + rs.getString("fecha_santiago")
+                        + " hoy_santiago=" + rs.getString("hoy_santiago"));
                 PedidoBD p = new PedidoBD(
                         rs.getInt("id"),
                         rs.getInt("numero"),
