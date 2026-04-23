@@ -70,6 +70,8 @@ public class PedidosServer {
                     int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
                             cliente, telefono, detalle, total, franja, "WEB", fechaEntrega);
 
+                    System.out.println("[PEDIDOS] Resultado: id=" + resultado[0] + " num=" + resultado[1]);
+
                     int id           = resultado[0];
                     int numeroPedido = resultado[1];
 
