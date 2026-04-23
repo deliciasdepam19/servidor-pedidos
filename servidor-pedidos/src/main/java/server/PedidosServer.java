@@ -245,7 +245,7 @@ if (minuto < 30) {
     finMin     = 0;
 }
 
-return String.format("%02d:%02d - %02d:%02d", inicioHora, inicioMin, finHora, finMin)
+return String.format("%02d:%02d - %02d:%02d", inicioHora, inicioMin, finHora, finMin);
     }
 
     private String escaparJson(String t) {
