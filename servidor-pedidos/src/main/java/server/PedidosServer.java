@@ -39,6 +39,7 @@ public class PedidosServer {
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
                     String body     = readBody(exchange);
+                    System.out.println("[PEDIDOS] Body recibido: " + body);
                     String cliente  = sanitizar(extraerValor(body, "cliente"));
                     String telefono = sanitizar(extraerValor(body, "telefono"));
                     String detalle  = sanitizar(extraerValor(body, "detalle"));
