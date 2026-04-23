@@ -231,12 +231,21 @@ public class PedidosServer {
             if (hora < 18 || hora >= 22) return "FUERA HORARIO";
         }
 
-        int inicioMin  = (minuto < 30) ? 30 : 0;
-        int horaInicio = (minuto < 30) ? hora : hora + 1;
-        int finMin     = (inicioMin == 30) ? 0  : 30;
-        int horaFin    = (inicioMin == 30) ? horaInicio + 1 : horaInicio;
+int inicioHora, inicioMin, finHora, finMin;
 
-        return String.format("%02d:%02d - %02d:%02d", horaInicio, inicioMin, horaFin, finMin);
+if (minuto < 30) {
+    inicioHora = hora;
+    inicioMin  = 0;
+    finHora    = hora;
+    finMin     = 30;
+} else {
+    inicioHora = hora;
+    inicioMin  = 30;
+    finHora    = hora + 1;
+    finMin     = 0;
+}
+
+return String.format("%02d:%02d - %02d:%02d", inicioHora, inicioMin, finHora, finMin)
     }
 
     private String escaparJson(String t) {
