@@ -90,10 +90,10 @@ public class PedidosDAO {
             return new int[]{id, numero};
 
         } catch (SQLException e) {
+            System.out.println("❌ Error guardando pedido: " + e.getMessage());
             try {
                 if (conn != null) {
                     conn.rollback();
-
                 }
             } catch (SQLException ignored) {
             }
