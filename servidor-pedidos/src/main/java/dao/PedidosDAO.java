@@ -360,11 +360,13 @@ public class PedidosDAO {
             PreparedStatement ps = conn.prepareStatement(
                     "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
                     + "FROM pedidos "
-                    + "WHERE estado = 'PENDIENTE' "
+                    + "WHERE origen = 'WEB' "
                     + "AND (fecha_hora::timestamptz AT TIME ZONE 'America/Santiago')::date = "
                     + "    (CURRENT_TIMESTAMP AT TIME ZONE 'America/Santiago')::date "
+                    + "AND estado NOT IN ('COBRADO', 'CANCELADO') "
                     + "ORDER BY fecha_hora ASC"
             );
+
             ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
