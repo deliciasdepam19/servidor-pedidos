@@ -38,7 +38,7 @@ public class PedidosServer {
 
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
-                    String body    = readBody(exchange);
+                    String body     = readBody(exchange);
                     String cliente  = sanitizar(extraerValor(body, "cliente"));
                     String telefono = sanitizar(extraerValor(body, "telefono"));
                     String detalle  = sanitizar(extraerValor(body, "detalle"));
@@ -88,7 +88,6 @@ public class PedidosServer {
         });
 
         servidor.createContext("/api/pedidos/historico", exchange -> {
-
             agregarCorsHeaders(exchange);
 
             if ("GET".equals(exchange.getRequestMethod())) {
@@ -120,7 +119,6 @@ public class PedidosServer {
         });
 
         servidor.createContext("/api/stock", exchange -> {
-
             agregarCorsHeaders(exchange);
 
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -137,13 +135,33 @@ public class PedidosServer {
                     enviarRespuesta(exchange, 500, "{}");
                 }
             }
+        }); 
+
+        servidor.createContext("/api/usuarios", exchange -> {
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body   = readBody(exchange);
+                    String nombre = sanitizar(extraerValor(body, "nombre"));
+                    String email  = sanitizar(extraerValor(body, "email"));
+                    System.out.println("Usuario: " + nombre + " / " + email);
+                    enviarRespuesta(exchange, 200, "{\"exito\":true}");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    enviarRespuesta(exchange, 400, "{\"exito\":false}");
+                }
+            }
         });
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
-    }
-
-    // ── Métodos auxiliares ────────────────────────────────────────────────────
+    } 
 
     private String readBody(HttpExchange exchange) throws IOException {
         return new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
@@ -204,7 +222,6 @@ public class PedidosServer {
         boolean esAnticipado = c.contains("pasteler") || c.contains("reposteri")
                             || d.contains("pasteler") || d.contains("reposteri");
 
-        // Validar con hora actual
         if (esPanaderia) {
             if (hora < 12 || hora >= 18) return "FUERA HORARIO";
         } else if (esAnticipado) {
@@ -213,7 +230,6 @@ public class PedidosServer {
             if (hora < 18 || hora >= 22) return "FUERA HORARIO";
         }
 
-        // Calcular franja de entrega
         int inicioMin  = (minuto < 30) ? 30 : 0;
         int horaInicio = (minuto < 30) ? hora : hora + 1;
         int finMin     = (inicioMin == 30) ? 0  : 30;
