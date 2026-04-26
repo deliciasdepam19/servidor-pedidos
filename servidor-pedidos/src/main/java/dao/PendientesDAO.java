@@ -68,16 +68,15 @@ public class PendientesDAO {
         String sqlUpdateVenta = "UPDATE ventas SET tipo_pago = ? "
                 + "WHERE id = ("
                 + "  SELECT id FROM ventas "
-                + "  WHERE nombre_cliente = ? AND fecha = ? AND tipo_pago = 'PENDIENTE' "
+                + "  WHERE nombre_cliente = ? AND tipo_pago = 'PENDIENTE' "
                 + "  ORDER BY id DESC LIMIT 1"
                 + ")";
-
         String sqlActualizarReporte = "UPDATE reportes SET "
                 + "total_pendiente = CASE WHEN total_pendiente - ? < 0 THEN 0 ELSE total_pendiente - ? END, "
                 + "total_efectivo = total_efectivo + CASE WHEN ? = 'EFECTIVO' THEN ? ELSE 0 END, "
                 + "total_transferencia = total_transferencia + CASE WHEN ? = 'TRANSFERENCIA' THEN ? ELSE 0 END, "
                 + "total = total + ? "
-                + "WHERE fecha = ?";
+                + "WHERE fecha::date = ?";
 
         Connection conn = null;
         try {
@@ -96,7 +95,7 @@ public class PendientesDAO {
                 }
                 nombreCliente = rs.getString("nombre_cliente");
                 total = rs.getDouble("total");
-                fechaVenta = rs.getString("fecha_venta");
+                fechaVenta = rs.getDate("fecha_venta").toLocalDate().toString();
                 detalle = rs.getString("detalle");
             }
 
@@ -110,20 +109,33 @@ public class PendientesDAO {
             try (PreparedStatement ps = conn.prepareStatement(sqlUpdateVenta)) {
                 ps.setString(1, tipoPago);
                 ps.setString(2, nombreCliente);
-                ps.setString(3, fechaVenta);
                 ps.executeUpdate();
             }
 
-            try (PreparedStatement ps = conn.prepareStatement(sqlActualizarReporte)) {
-                ps.setDouble(1, total);
-                ps.setDouble(2, total);
-                ps.setString(3, tipoPago);
-                ps.setDouble(4, total);
-                ps.setString(5, tipoPago);
-                ps.setDouble(6, total);
-                ps.setDouble(7, total);
-                ps.setString(8, fechaVenta);
-                ps.executeUpdate();
+            // Verificar si existe reporte para esa fecha
+            try (PreparedStatement psCheck = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM reportes WHERE fecha::date = ?")) {
+                psCheck.setDate(1, java.sql.Date.valueOf(fechaVenta));
+                ResultSet rsCheck = psCheck.executeQuery();
+                boolean existeReporte = rsCheck.next() && rsCheck.getInt(1) > 0;
+                System.out.println("=== Reporte existe: " + existeReporte);
+
+                if (existeReporte) {
+                    try (PreparedStatement ps = conn.prepareStatement(sqlActualizarReporte)) {
+                        ps.setDouble(1, total);
+                        ps.setDouble(2, total);
+                        ps.setString(3, tipoPago);
+                        ps.setDouble(4, total);
+                        ps.setString(5, tipoPago);
+                        ps.setDouble(6, total);
+                        ps.setDouble(7, total);
+                        ps.setDate(8, java.sql.Date.valueOf(fechaVenta));
+                        int filas = ps.executeUpdate();
+                        System.out.println("=== UPDATE REPORTE: filas afectadas = " + filas);
+                    }
+                } else {
+                    System.out.println("=== Sin reporte aún, se incluirá al cerrar el día");
+                }
             }
 
             conn.commit();
