@@ -69,7 +69,7 @@ public class PedidosDAO {
                 psIns.setDouble(5, total);
                 psIns.setString(6, franja);
                 psIns.setString(7, origen);
-                // fecha_entrega puede ser null para pedidos normales
+
                 if (fechaEntrega != null && !fechaEntrega.isBlank()) {
                     psIns.setDate(8, java.sql.Date.valueOf(
                             java.time.LocalDate.parse(fechaEntrega,
@@ -90,7 +90,9 @@ public class PedidosDAO {
             return new int[]{id, numero};
 
         } catch (SQLException e) {
-            System.out.println("❌ Error guardando pedido: " + e.getMessage());
+            System.out.println("❌ [PEDIDO] Error SQL: " + e.getMessage());
+            System.out.println("❌ [PEDIDO] SQLState: " + e.getSQLState());
+            System.out.println("❌ [PEDIDO] ErrorCode: " + e.getErrorCode());
             try {
                 if (conn != null) {
                     conn.rollback();
@@ -360,10 +362,9 @@ public class PedidosDAO {
             PreparedStatement ps = conn.prepareStatement(
                     "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
                     + "FROM pedidos "
-                    + "WHERE origen = 'WEB' "
-                    + "AND (fecha_hora::timestamptz AT TIME ZONE 'America/Santiago')::date = "
+                    + "WHERE (fecha_hora::timestamptz AT TIME ZONE 'America/Santiago')::date = "
                     + "    (CURRENT_TIMESTAMP AT TIME ZONE 'America/Santiago')::date "
-                    + "AND estado NOT IN ('COBRADO', 'CANCELADO') "
+                    + "AND estado NOT IN ('COBRADO', 'CANCELADO', 'ELIMINADO') "
                     + "ORDER BY fecha_hora ASC"
             );
 
@@ -371,9 +372,7 @@ public class PedidosDAO {
             System.out.println("[DAO] Ejecutando query pedidos pendientes hoy...");
 
             while (rs.next()) {
-                System.out.println("[DAO] Encontrado id=" + rs.getInt("id")
-                        + " fecha_santiago=" + rs.getString("fecha_santiago")
-                        + " hoy_santiago=" + rs.getString("hoy_santiago"));
+                System.out.println("[DAO] Encontrado id=" + rs.getInt("id"));
                 PedidoBD p = new PedidoBD(
                         rs.getInt("id"),
                         rs.getInt("numero"),
