@@ -174,9 +174,7 @@ public class VentaDAO {
 
         try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT COUNT(*) FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE'")) {
-
             ps.setDate(1, sqlFecha);
-
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     ventas += rs.getInt(1);
@@ -186,9 +184,7 @@ public class VentaDAO {
 
         try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha::date = ? AND grupo_venta_id IS NULL")) {
-
             ps.setDate(1, sqlFecha);
-
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     ventas += rs.getInt(1);
@@ -445,7 +441,7 @@ public class VentaDAO {
             }
 
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COALESCE(SUM(cantidad), 0) FROM ventas_rapidas WHERE fecha::date = ?")) {
+                    "SELECT COALESCE(SUM(cantidad), 0) FROM ventas_rapidas WHERE fecha::date = ? AND grupo_venta_id IS NULL")) {
 
                 ps.setDate(1, sqlFecha);
 
@@ -472,7 +468,7 @@ public class VentaDAO {
             conn = Conexion.conectar();
             java.sql.Date sqlFecha = java.sql.Date.valueOf(fecha);
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE'")) {
+                    "SELECT COUNT(*) FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE' AND origen = 'WEB'")) {
                 ps.setDate(1, sqlFecha);
                 try (ResultSet rs = ps.executeQuery()) {
                     return rs.next() ? rs.getInt(1) : 0;
@@ -491,13 +487,31 @@ public class VentaDAO {
         try {
             conn = Conexion.conectar();
             java.sql.Date sqlFecha = java.sql.Date.valueOf(fecha);
+
+            int desdeVentas = 0;
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE' AND origen = 'LOCAL'")) {
+                ps.setDate(1, sqlFecha);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        desdeVentas = rs.getInt(1);
+                    }
+                }
+            }
+
+            int desdeRapidas = 0;
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COUNT(*) FROM ventas_rapidas WHERE fecha::date = ? AND grupo_venta_id IS NULL")) {
                 ps.setDate(1, sqlFecha);
                 try (ResultSet rs = ps.executeQuery()) {
-                    return rs.next() ? rs.getInt(1) : 0;
+                    if (rs.next()) {
+                        desdeRapidas = rs.getInt(1);
+                    }
                 }
             }
+
+            return desdeVentas + desdeRapidas;
+
         } catch (SQLException e) {
             e.printStackTrace();
             return 0;
@@ -554,15 +568,38 @@ public class VentaDAO {
             int pedidosWeb = contarVentasWeb(fecha);
             int pedidosLocal = contarVentasLocal(fecha);
 
+            // ── Pendientes liquidados antes del cierre ────────────────────────────
+            double liquidadoEfectivo = 0;
+            double liquidadoTransferencia = 0;
+
+            try (PreparedStatement psLiq = conn.prepareStatement(
+                    "SELECT COALESCE(SUM(total), 0), tipo_pago_liquidacion "
+                    + "FROM ventas_pendientes "
+                    + "WHERE fecha_venta = ? AND estado = 'PAGADO' "
+                    + "GROUP BY tipo_pago_liquidacion")) {
+                psLiq.setDate(1, java.sql.Date.valueOf(fecha));
+                ResultSet rsLiq = psLiq.executeQuery();
+                while (rsLiq.next()) {
+                    String tipo = rsLiq.getString("tipo_pago_liquidacion");
+                    double monto = rsLiq.getDouble(1);
+                    if ("EFECTIVO".equals(tipo)) {
+                        liquidadoEfectivo += monto; 
+                    }else if ("TRANSFERENCIA".equals(tipo)) {
+                        liquidadoTransferencia += monto;
+                    }
+                }
+            }
+
+            // ── INSERT reporte ────────────────────────────────────────────────────
             try (PreparedStatement psReporte = conn.prepareStatement(
                     "INSERT INTO reportes (fecha, total, total_efectivo, total_transferencia, "
                     + "total_pendiente, generado_por, detalle, pedidos_web, pedidos_local, detalle_categorias) "
                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
 
                 psReporte.setDate(1, java.sql.Date.valueOf(fecha));
-                psReporte.setDouble(2, total);
-                psReporte.setDouble(3, totalEfectivo);
-                psReporte.setDouble(4, totalTransferencia);
+                psReporte.setDouble(2, total + liquidadoEfectivo + liquidadoTransferencia);
+                psReporte.setDouble(3, totalEfectivo + liquidadoEfectivo);
+                psReporte.setDouble(4, totalTransferencia + liquidadoTransferencia);
                 psReporte.setDouble(5, pendiente);
                 psReporte.setString(6, usuario);
                 psReporte.setString(7, detalleStr.toString());
@@ -572,6 +609,7 @@ public class VentaDAO {
                 psReporte.executeUpdate();
             }
 
+            // ── Eliminar ventas del día ───────────────────────────────────────────
             try (PreparedStatement psDel1 = conn.prepareStatement(
                     "DELETE FROM detalle_ventas WHERE venta_id IN "
                     + "(SELECT id FROM ventas WHERE fecha::date = ?)")) {
@@ -601,7 +639,6 @@ public class VentaDAO {
             try {
                 if (conn != null) {
                     conn.rollback();
-
                 }
             } catch (SQLException ex) {
                 ex.printStackTrace();
@@ -690,5 +727,116 @@ public class VentaDAO {
 
     public void invalidarCache() {
         Conexion.invalidateCache(CACHE_PREFIX);
+    }
+
+    public boolean registrarVentaSinDescontarStock(
+            Map<String, Integer> carrito,
+            Map<String, String> categorias,
+            Map<String, String> nombres,
+            Map<String, Double> precios,
+            Map<String, Integer> ids,
+            String tipoPago,
+            String nombreCliente) {
+
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            conn.setAutoCommit(false);
+
+            double totalVenta = 0;
+            for (Map.Entry<String, Integer> entry : carrito.entrySet()) {
+                Double precio = precios.get(entry.getKey());
+                if (precio != null) {
+                    totalVenta += precio * entry.getValue();
+                }
+            }
+
+            java.sql.Date hoy = java.sql.Date.valueOf(java.time.LocalDate.now());
+            int ventaId = -1;
+
+            boolean tieneConId = ids.values().stream().anyMatch(id -> id != null && id > 0);
+
+            if (tieneConId) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente, origen) VALUES (?, ?, ?, ?, ?)",
+                        Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setDate(1, hoy);
+                    ps.setDouble(2, totalVenta);
+                    ps.setString(3, tipoPago);
+                    ps.setString(4, nombreCliente);
+                    ps.setString(5, "LOCAL");
+                    ps.executeUpdate();
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        if (!keys.next()) {
+                            conn.rollback();
+                            return false;
+                        }
+                        ventaId = keys.getInt(1);
+                    }
+                }
+
+                for (Map.Entry<String, Integer> entry : carrito.entrySet()) {
+                    String key = entry.getKey();
+                    Integer prodId = ids.get(key);
+                    if (prodId == null || prodId <= 0) {
+                        continue;
+                    }
+
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "INSERT INTO detalle_ventas (venta_id, producto_tipo, producto_id, nombre, cantidad, subtotal) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)")) {
+                        ps.setInt(1, ventaId);
+                        ps.setString(2, categorias.getOrDefault(key, "").toLowerCase());
+                        ps.setInt(3, prodId);
+                        ps.setString(4, nombres.get(key));
+                        ps.setInt(5, entry.getValue());
+                        ps.setDouble(6, precios.get(key) * entry.getValue());
+                        ps.executeUpdate();
+                    }
+                }
+            }
+
+            for (Map.Entry<String, Integer> entry : carrito.entrySet()) {
+                String key = entry.getKey();
+                Integer prodId = ids.get(key);
+                if (prodId != null && prodId > 0) {
+                    continue;
+                }
+
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO ventas_rapidas (fecha, nombre, cantidad, precio_unitario, subtotal, tipo_pago, grupo_venta_id) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+                    ps.setDate(1, hoy);
+                    ps.setString(2, nombres.get(key));
+                    ps.setInt(3, entry.getValue());
+                    ps.setDouble(4, precios.get(key));
+                    ps.setDouble(5, precios.get(key) * entry.getValue());
+                    ps.setString(6, tipoPago);
+                    if (ventaId > 0) {
+                        ps.setInt(7, ventaId);
+                    } else {
+                        ps.setNull(7, Types.INTEGER);
+                    }
+                    ps.executeUpdate();
+                }
+            }
+
+            conn.commit();
+            Conexion.invalidateCache(CACHE_PREFIX);
+            return true;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            try {
+                if (conn != null) {
+                    conn.rollback();
+
+                }
+            } catch (SQLException ignored) {
+            }
+            return false;
+        } finally {
+            cerrarConexion(conn);
+        }
     }
 }
