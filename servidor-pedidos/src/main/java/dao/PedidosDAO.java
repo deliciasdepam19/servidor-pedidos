@@ -404,4 +404,41 @@ public class PedidosDAO {
 
         return pedidos;
     }
+
+    public List<PedidoBD> cargarPedidosNuevosDesde(java.sql.Timestamp desde) {
+        List<PedidoBD> pedidos = new ArrayList<>();
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            PreparedStatement ps = conn.prepareStatement(
+                    "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
+                    + "FROM pedidos "
+                    + "WHERE fecha_hora > ? "
+                    + "AND estado NOT IN ('COBRADO', 'CANCELADO', 'ELIMINADO') "
+                    + "ORDER BY fecha_hora ASC"
+            );
+            ps.setTimestamp(1, desde);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                PedidoBD p = new PedidoBD(
+                        rs.getInt("id"), rs.getInt("numero"),
+                        rs.getString("cliente"), rs.getString("telefono"),
+                        rs.getString("detalle"), rs.getDouble("total"),
+                        rs.getString("estado"), rs.getString("franja"),
+                        rs.getString("fecha_hora")
+                );
+                p.origen = rs.getString("origen");
+                pedidos.add(p);
+            }
+            rs.close();
+            ps.close();
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+        } finally {
+            if (conn != null) {
+                Conexion.devolver(conn);
+            }
+        }
+        return pedidos;
+    }
 }
