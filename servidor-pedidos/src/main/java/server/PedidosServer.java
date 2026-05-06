@@ -29,7 +29,6 @@ public class PedidosServer {
     private final Map<String, Long>    ultimoPedidoPorIp = new ConcurrentHashMap<>();
     private final Map<String, Integer> contadorPorIp     = new ConcurrentHashMap<>();
 
-    // ── Representa un item del carrito enviado desde la carta ──────────────
     private static class ItemCarrito {
         String nombre;
         String categoria;
@@ -81,7 +80,6 @@ public class PedidosServer {
                         fechaEntrega = null;
                     }
 
-                    // ── Guardar pedido ────────────────────────────────────
                     int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
                             cliente, telefono, detalle, total, franja, "WEB", fechaEntrega);
 
@@ -90,7 +88,6 @@ public class PedidosServer {
                     int id           = resultado[0];
                     int numeroPedido = resultado[1];
 
-                    // ── Descontar inventario ──────────────────────────────
                     if (id > 0) {
                         descontarInventarioDesdeItems(body);
                     }
@@ -186,7 +183,6 @@ public class PedidosServer {
         System.out.println("Servidor OK puerto " + PUERTO);
     }
 
-    // ── Descuenta inventario usando la receta de cada item ─────────────────
     private void descontarInventarioDesdeItems(String json) {
         List<ItemCarrito> items = extraerItems(json);
         for (ItemCarrito item : items) {
@@ -197,10 +193,8 @@ public class PedidosServer {
                 List<RecetaItem> receta;
 
                 if (cat.equals("rapido") || cat.isEmpty()) {
-                    // Producto rápido: buscar por nombre
                     receta = recetaDAO.obtenerPorNombre(item.nombre);
                 } else {
-                    // Empanada, sopaipilla, etc.: buscar por categoría genérica (id=0)
                     receta = recetaDAO.obtenerPorProducto(0, cat);
                 }
 
@@ -217,8 +211,6 @@ public class PedidosServer {
         }
     }
 
-    // ── Parsea el array "items" del JSON ───────────────────────────────────
-    // JSON esperado: "items":[{"id":"...","nombre":"...","cantidad":2,"precio":...,"categoria":"..."}]
     private List<ItemCarrito> extraerItems(String json) {
         List<ItemCarrito> lista = new ArrayList<>();
         try {
@@ -231,7 +223,6 @@ public class PedidosServer {
 
             String itemsStr = json.substring(inicio + 1, fin);
 
-            // Separar cada objeto {}
             int i = 0;
             while ((i = itemsStr.indexOf("{", i)) != -1) {
                 int cierre = itemsStr.indexOf("}", i);
