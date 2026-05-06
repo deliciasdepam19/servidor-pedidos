@@ -188,7 +188,14 @@ public class PedidosServer {
         for (ItemCarrito item : items) {
             try {
                 String cat = item.categoria != null
-                        ? item.categoria.toLowerCase().trim() : "";
+                ? item.categoria.toLowerCase().trim() : "";
+                
+                if (cat.endsWith("s") && !cat.equals("rapido")) {
+                    cat = cat.substring(0, cat.length() - 1);
+                }
+                cat = cat.replace("á","a").replace("é","e")
+                    .replace("í","i").replace("ó","o")
+                    .replace("ú","u").replace("ñ","n");
 
                 List<RecetaItem> receta;
 
