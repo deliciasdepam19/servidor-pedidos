@@ -43,10 +43,18 @@ public class PedidosDAO {
     public int[] guardarPedidoAutoNumero(String cliente, String telefono,
             String detalle, double total, String franja, String origen,
             String fechaEntrega) {
+        return guardarPedidoAutoNumero(cliente, telefono, detalle, total,
+                franja, origen, fechaEntrega, null);
+    }
+
+    public int[] guardarPedidoAutoNumero(String cliente, String telefono,
+            String detalle, double total, String franja, String origen,
+            String fechaEntrega, String categoriasDetalle) {
 
         String sqlNum = "SELECT nextval('pedidos_numero_seq')";
-        String sqlIns = "INSERT INTO pedidos (numero, cliente, telefono, detalle, total, estado, franja, origen, fecha_entrega) "
-                + "VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?)";
+        String sqlIns = "INSERT INTO pedidos "
+                + "(numero, cliente, telefono, detalle, total, estado, franja, origen, fecha_entrega, categorias_detalle) "
+                + "VALUES (?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?)";
 
         Connection conn = null;
         try {
@@ -61,7 +69,8 @@ public class PedidosDAO {
             }
 
             int id = -1;
-            try (PreparedStatement psIns = conn.prepareStatement(sqlIns, Statement.RETURN_GENERATED_KEYS)) {
+            try (PreparedStatement psIns = conn.prepareStatement(sqlIns,
+                    Statement.RETURN_GENERATED_KEYS)) {
                 psIns.setInt(1, numero);
                 psIns.setString(2, cliente);
                 psIns.setString(3, telefono);
@@ -77,6 +86,13 @@ public class PedidosDAO {
                 } else {
                     psIns.setNull(8, java.sql.Types.DATE);
                 }
+
+                if (categoriasDetalle != null && !categoriasDetalle.isBlank()) {
+                    psIns.setString(9, categoriasDetalle);
+                } else {
+                    psIns.setNull(9, java.sql.Types.VARCHAR);
+                }
+
                 psIns.executeUpdate();
                 try (ResultSet rs = psIns.getGeneratedKeys()) {
                     if (rs.next()) {
@@ -202,8 +218,7 @@ public class PedidosDAO {
 
     public List<PedidoBD> cargarPedidosDeHoy() {
         List<PedidoBD> lista = new ArrayList<>();
-        String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, origen, "
-                + "fecha_hora "
+        String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, origen, fecha_hora "
                 + "FROM pedidos "
                 + "WHERE fecha_hora::date = CURRENT_DATE "
                 + "AND estado NOT IN ('COBRADO', 'ELIMINADO') "
@@ -214,16 +229,11 @@ public class PedidosDAO {
             try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     PedidoBD pb = new PedidoBD(
-                            rs.getInt("id"),
-                            rs.getInt("numero"),
-                            rs.getString("cliente"),
-                            rs.getString("telefono"),
-                            rs.getString("detalle"),
-                            rs.getDouble("total"),
-                            rs.getString("estado"),
-                            rs.getString("franja"),
-                            rs.getString("fecha_hora")
-                    );
+                            rs.getInt("id"), rs.getInt("numero"),
+                            rs.getString("cliente"), rs.getString("telefono"),
+                            rs.getString("detalle"), rs.getDouble("total"),
+                            rs.getString("estado"), rs.getString("franja"),
+                            rs.getString("fecha_hora"));
                     pb.origen = rs.getString("origen");
                     lista.add(pb);
                 }
@@ -278,8 +288,7 @@ public class PedidosDAO {
     }
 
     public int obtenerProximoNumero(String origen) {
-        String sql = "SELECT COALESCE(MAX(numero), 0) + 1 FROM pedidos "
-                + "WHERE UPPER(origen) = UPPER(?)";
+        String sql = "SELECT COALESCE(MAX(numero), 0) + 1 FROM pedidos WHERE UPPER(origen) = UPPER(?)";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
@@ -332,18 +341,13 @@ public class PedidosDAO {
         Connection conn = null;
         try {
             conn = Conexion.conectar();
-
             PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE pedidos SET estado = 'PROCESADO' WHERE id = ?"
-            );
-
+                    "UPDATE pedidos SET estado = 'PROCESADO' WHERE id = ?");
             ps.setInt(1, id);
             ps.executeUpdate();
-
             ps.close();
-
         } catch (Exception e) {
-            System.out.println(" Error al marcar pedido como PROCESADO: " + e.getMessage());
+            System.out.println("Error al marcar pedido como PROCESADO: " + e.getMessage());
             e.printStackTrace();
         } finally {
             if (conn != null) {
@@ -355,44 +359,30 @@ public class PedidosDAO {
     public List<PedidoBD> cargarPedidosPendientesDeHoy() {
         List<PedidoBD> pedidos = new ArrayList<>();
         Connection conn = null;
-
         try {
             conn = Conexion.conectar();
-
             PreparedStatement ps = conn.prepareStatement(
                     "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
                     + "FROM pedidos "
                     + "WHERE (fecha_hora::timestamptz AT TIME ZONE 'America/Santiago')::date = "
                     + "    (CURRENT_TIMESTAMP AT TIME ZONE 'America/Santiago')::date "
                     + "AND estado NOT IN ('COBRADO', 'CANCELADO', 'ELIMINADO') "
-                    + "ORDER BY fecha_hora ASC"
-            );
-
+                    + "ORDER BY fecha_hora ASC");
             ResultSet rs = ps.executeQuery();
             System.out.println("[DAO] Ejecutando query pedidos pendientes hoy...");
-
             while (rs.next()) {
                 System.out.println("[DAO] Encontrado id=" + rs.getInt("id"));
                 PedidoBD p = new PedidoBD(
-                        rs.getInt("id"),
-                        rs.getInt("numero"),
-                        rs.getString("cliente"),
-                        rs.getString("telefono"),
-                        rs.getString("detalle"),
-                        rs.getDouble("total"),
-                        rs.getString("estado"),
-                        rs.getString("franja"),
-                        rs.getString("fecha_hora")
-                );
-
+                        rs.getInt("id"), rs.getInt("numero"),
+                        rs.getString("cliente"), rs.getString("telefono"),
+                        rs.getString("detalle"), rs.getDouble("total"),
+                        rs.getString("estado"), rs.getString("franja"),
+                        rs.getString("fecha_hora"));
                 p.origen = rs.getString("origen");
-
                 pedidos.add(p);
             }
-
             rs.close();
             ps.close();
-
         } catch (Exception e) {
             System.out.println("Error cargando pedidos pendientes: " + e.getMessage());
             e.printStackTrace();
@@ -401,7 +391,6 @@ public class PedidosDAO {
                 Conexion.devolver(conn);
             }
         }
-
         return pedidos;
     }
 
@@ -415,8 +404,7 @@ public class PedidosDAO {
                     + "FROM pedidos "
                     + "WHERE fecha_hora > ? "
                     + "AND estado NOT IN ('COBRADO', 'CANCELADO', 'ELIMINADO') "
-                    + "ORDER BY fecha_hora ASC"
-            );
+                    + "ORDER BY fecha_hora ASC");
             ps.setTimestamp(1, desde);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
@@ -425,8 +413,7 @@ public class PedidosDAO {
                         rs.getString("cliente"), rs.getString("telefono"),
                         rs.getString("detalle"), rs.getDouble("total"),
                         rs.getString("estado"), rs.getString("franja"),
-                        rs.getString("fecha_hora")
-                );
+                        rs.getString("fecha_hora"));
                 p.origen = rs.getString("origen");
                 pedidos.add(p);
             }
