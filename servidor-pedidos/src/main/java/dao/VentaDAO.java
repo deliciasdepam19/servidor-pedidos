@@ -427,15 +427,14 @@ public class VentaDAO {
             conn = Conexion.conectar();
             java.sql.Date sqlFecha = java.sql.Date.valueOf(fecha);
 
+            // ── 1. Ventas locales desde detalle_ventas ─────────────────────────
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT d.producto_tipo, SUM(d.cantidad) as total "
                     + "FROM ventas v "
                     + "JOIN detalle_ventas d ON v.id = d.venta_id "
                     + "WHERE v.fecha::date = ? AND v.tipo_pago != 'PENDIENTE' "
                     + "GROUP BY d.producto_tipo")) {
-
                 ps.setDate(1, sqlFecha);
-
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         String tipo = rs.getString("producto_tipo");
@@ -443,8 +442,8 @@ public class VentaDAO {
                         if (tipo != null) {
                             String t = tipo.toLowerCase().trim();
                             if (t.contains("empanada")) {
-                                result[0] += total;
-                            } else if (t.contains("sopaipilla")) {
+                                result[0] += total; 
+                            }else if (t.contains("sopaipilla")) {
                                 result[1] += total;
                             }
                         }
@@ -452,14 +451,51 @@ public class VentaDAO {
                 }
             }
 
+            // ── 2. Ventas rápidas locales ──────────────────────────────────────
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COALESCE(SUM(cantidad), 0) FROM ventas_rapidas WHERE fecha::date = ? AND grupo_venta_id IS NULL")) {
-
+                    "SELECT COALESCE(SUM(cantidad), 0) FROM ventas_rapidas "
+                    + "WHERE fecha::date = ? AND grupo_venta_id IS NULL")) {
                 ps.setDate(1, sqlFecha);
-
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        result[2] = rs.getInt(1);
+                        result[2] += rs.getInt(1);
+                    }
+                }
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT categorias_detalle FROM pedidos "
+                    + "WHERE fecha_hora::date = ? AND origen = 'WEB' "
+                    + "AND categorias_detalle IS NOT NULL "
+                    + "AND estado NOT IN ('CANCELADO', 'ELIMINADO')")) {
+                ps.setDate(1, sqlFecha);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String catDetalle = rs.getString("categorias_detalle");
+                        if (catDetalle == null || catDetalle.isBlank()) {
+                            continue;
+                        }
+
+                        for (String parte : catDetalle.split(",")) {
+                            String[] kv = parte.trim().split(":");
+                            if (kv.length != 2) {
+                                continue;
+                            }
+                            String cat = kv[0].trim();
+                            int cant;
+                            try {
+                                cant = Integer.parseInt(kv[1].trim());
+                            } catch (NumberFormatException ex) {
+                                continue;
+                            }
+                            if (cat.contains("empanada")) {
+                                result[0] += cant; 
+                            }else if (cat.contains("sopaipilla")) {
+                                result[1] += cant; 
+                            }else {
+                                result[2] += cant;
+                            }
+                        }
                     }
                 }
             }
