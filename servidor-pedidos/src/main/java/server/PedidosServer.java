@@ -2,17 +2,23 @@ package server;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import dao.InventarioDAO;
 import dao.PedidosDAO;
+import dao.RecetaDAO;
+import dao.RecetaItem;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PedidosServer {
 
-    private final PedidosDAO pedidosDAO = new PedidosDAO();
+    private final PedidosDAO   pedidosDAO   = new PedidosDAO();
+    private final RecetaDAO    recetaDAO    = new RecetaDAO();
+    private final InventarioDAO invDAO      = new InventarioDAO();
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT"))
@@ -20,8 +26,15 @@ public class PedidosServer {
 
     private HttpServer servidor;
 
-    private final Map<String, Long> ultimoPedidoPorIp = new ConcurrentHashMap<>();
-    private final Map<String, Integer> contadorPorIp  = new ConcurrentHashMap<>();
+    private final Map<String, Long>    ultimoPedidoPorIp = new ConcurrentHashMap<>();
+    private final Map<String, Integer> contadorPorIp     = new ConcurrentHashMap<>();
+
+    // ── Representa un item del carrito enviado desde la carta ──────────────
+    private static class ItemCarrito {
+        String nombre;
+        String categoria;
+        int    cantidad;
+    }
 
     public PedidosServer() throws IOException {
 
@@ -40,6 +53,7 @@ public class PedidosServer {
                 try {
                     String body     = readBody(exchange);
                     System.out.println("[PEDIDOS] Body recibido: " + body);
+
                     String cliente  = sanitizar(extraerValor(body, "cliente"));
                     String telefono = sanitizar(extraerValor(body, "telefono"));
                     String detalle  = sanitizar(extraerValor(body, "detalle"));
@@ -67,6 +81,7 @@ public class PedidosServer {
                         fechaEntrega = null;
                     }
 
+                    // ── Guardar pedido ────────────────────────────────────
                     int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
                             cliente, telefono, detalle, total, franja, "WEB", fechaEntrega);
 
@@ -74,6 +89,11 @@ public class PedidosServer {
 
                     int id           = resultado[0];
                     int numeroPedido = resultado[1];
+
+                    // ── Descontar inventario ──────────────────────────────
+                    if (id > 0) {
+                        descontarInventarioDesdeItems(body);
+                    }
 
                     String respuesta = "{"
                             + "\"exito\":true,"
@@ -138,7 +158,7 @@ public class PedidosServer {
                     enviarRespuesta(exchange, 500, "{}");
                 }
             }
-        }); 
+        });
 
         servidor.createContext("/api/usuarios", exchange -> {
             agregarCorsHeaders(exchange);
@@ -164,7 +184,78 @@ public class PedidosServer {
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
-    } 
+    }
+
+    // ── Descuenta inventario usando la receta de cada item ─────────────────
+    private void descontarInventarioDesdeItems(String json) {
+        List<ItemCarrito> items = extraerItems(json);
+        for (ItemCarrito item : items) {
+            try {
+                String cat = item.categoria != null
+                        ? item.categoria.toLowerCase().trim() : "";
+
+                List<RecetaItem> receta;
+
+                if (cat.equals("rapido") || cat.isEmpty()) {
+                    // Producto rápido: buscar por nombre
+                    receta = recetaDAO.obtenerPorNombre(item.nombre);
+                } else {
+                    // Empanada, sopaipilla, etc.: buscar por categoría genérica (id=0)
+                    receta = recetaDAO.obtenerPorProducto(0, cat);
+                }
+
+                for (RecetaItem r : receta) {
+                    double gramosTotal = r.getCantidadG() * item.cantidad;
+                    invDAO.descontarStock(r.getIdIngrediente(), gramosTotal);
+                    System.out.println("[INV] Descontado " + gramosTotal + "g de ingrediente "
+                            + r.getIdIngrediente() + " por " + item.cantidad + "x " + item.nombre);
+                }
+
+            } catch (Exception e) {
+                System.out.println("[INV] Error descontando " + item.nombre + ": " + e.getMessage());
+            }
+        }
+    }
+
+    // ── Parsea el array "items" del JSON ───────────────────────────────────
+    // JSON esperado: "items":[{"id":"...","nombre":"...","cantidad":2,"precio":...,"categoria":"..."}]
+    private List<ItemCarrito> extraerItems(String json) {
+        List<ItemCarrito> lista = new ArrayList<>();
+        try {
+            int inicio = json.indexOf("\"items\":");
+            if (inicio == -1) return lista;
+
+            inicio = json.indexOf("[", inicio);
+            int fin = json.indexOf("]", inicio);
+            if (inicio == -1 || fin == -1) return lista;
+
+            String itemsStr = json.substring(inicio + 1, fin);
+
+            // Separar cada objeto {}
+            int i = 0;
+            while ((i = itemsStr.indexOf("{", i)) != -1) {
+                int cierre = itemsStr.indexOf("}", i);
+                if (cierre == -1) break;
+                String obj = itemsStr.substring(i, cierre + 1);
+
+                ItemCarrito item = new ItemCarrito();
+                item.nombre    = extraerValor(obj, "nombre");
+                item.categoria = extraerValor(obj, "categoria");
+                item.cantidad  = (int) extraerDouble(obj, "cantidad");
+
+                if (item.nombre != null && !item.nombre.equals("-") && item.cantidad > 0) {
+                    lista.add(item);
+                    System.out.println("[INV] Item parseado: " + item.cantidad
+                            + "x " + item.nombre + " cat=" + item.categoria);
+                }
+
+                i = cierre + 1;
+            }
+        } catch (Exception e) {
+            System.out.println("[INV] Error parseando items: " + e.getMessage());
+        }
+        return lista;
+    }
 
     private String readBody(HttpExchange exchange) throws IOException {
         return new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
@@ -233,21 +324,21 @@ public class PedidosServer {
             if (hora < 18 || hora >= 22) return "FUERA HORARIO";
         }
 
-int inicioHora, inicioMin, finHora, finMin;
+        int inicioHora, inicioMin, finHora, finMin;
 
-if (minuto < 30) {
-    inicioHora = hora;
-    inicioMin  = 0;
-    finHora    = hora;
-    finMin     = 30;
-} else {
-    inicioHora = hora;
-    inicioMin  = 30;
-    finHora    = hora + 1;
-    finMin     = 0;
-}
+        if (minuto < 30) {
+            inicioHora = hora;
+            inicioMin  = 0;
+            finHora    = hora;
+            finMin     = 30;
+        } else {
+            inicioHora = hora;
+            inicioMin  = 30;
+            finHora    = hora + 1;
+            finMin     = 0;
+        }
 
-return String.format("%02d:%02d - %02d:%02d", inicioHora, inicioMin, finHora, finMin);
+        return String.format("%02d:%02d - %02d:%02d", inicioHora, inicioMin, finHora, finMin);
     }
 
     private String escaparJson(String t) {
