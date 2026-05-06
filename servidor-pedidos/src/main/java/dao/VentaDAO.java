@@ -8,6 +8,18 @@ public class VentaDAO {
 
     private static final String CACHE_PREFIX = "venta_";
 
+    private Runnable onVentaExitosa;
+
+    public void setOnVentaExitosa(Runnable callback) {
+        this.onVentaExitosa = callback;
+    }
+
+    private void notificar() {
+        if (onVentaExitosa != null) {
+            onVentaExitosa.run();
+        }
+    }
+
     public double totalDelDia(String fecha) {
         Connection conn = null;
         try {
@@ -231,9 +243,7 @@ public class VentaDAO {
 
                 try (PreparedStatement ps = conn.prepareStatement(
                         "SELECT stock FROM " + tabla + " WHERE id = ?")) {
-
                     ps.setInt(1, id);
-
                     try (ResultSet rs = ps.executeQuery()) {
                         if (!rs.next() || rs.getInt("stock") < cantidad) {
                             conn.rollback();
@@ -244,11 +254,9 @@ public class VentaDAO {
             }
 
             double totalVenta = 0;
-
             for (Map.Entry<Integer, Integer> e : items.entrySet()) {
                 totalVenta += precios.get(e.getKey()) * e.getValue();
             }
-
             if (rapidosCant != null && rapidosPrecios != null) {
                 for (String key : rapidosCant.keySet()) {
                     totalVenta += rapidosPrecios.getOrDefault(key, 0.0)
@@ -259,18 +267,18 @@ public class VentaDAO {
             int ventaId = -1;
             java.sql.Date hoy = java.sql.Date.valueOf(java.time.LocalDate.now());
 
+            RecetaDAO recetaDAO = new RecetaDAO();
+            InventarioDAO invDAO = new InventarioDAO();
+
             if (!items.isEmpty()) {
                 try (PreparedStatement psVenta = conn.prepareStatement(
                         "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) VALUES (?, ?, ?, ?)",
                         Statement.RETURN_GENERATED_KEYS)) {
-
                     psVenta.setDate(1, hoy);
                     psVenta.setDouble(2, totalVenta);
                     psVenta.setString(3, tipoPago);
                     psVenta.setString(4, nombreCliente);
-
                     psVenta.executeUpdate();
-
                     try (ResultSet keys = psVenta.getGeneratedKeys()) {
                         if (!keys.next()) {
                             conn.rollback();
@@ -289,23 +297,24 @@ public class VentaDAO {
                     try (PreparedStatement psDet = conn.prepareStatement(
                             "INSERT INTO detalle_ventas (venta_id, producto_tipo, producto_id, nombre, cantidad, subtotal) "
                             + "VALUES (?, ?, ?, ?, ?, ?)")) {
-
                         psDet.setInt(1, ventaId);
                         psDet.setString(2, categoria.toLowerCase());
                         psDet.setInt(3, id);
                         psDet.setString(4, nombres.get(id));
                         psDet.setInt(5, cantidad);
                         psDet.setDouble(6, precios.get(id) * cantidad);
-
                         psDet.executeUpdate();
                     }
 
                     try (PreparedStatement psStock = conn.prepareStatement(
                             "UPDATE " + tabla + " SET stock = stock - ? WHERE id = ?")) {
-
                         psStock.setInt(1, cantidad);
                         psStock.setInt(2, id);
                         psStock.executeUpdate();
+                    }
+
+                    for (RecetaItem item : recetaDAO.obtenerPorProducto(id, categoria.toLowerCase())) {
+                        invDAO.descontarStock(item.getIdIngrediente(), item.getCantidadG() * cantidad);
                     }
                 }
             }
@@ -319,27 +328,29 @@ public class VentaDAO {
                     try (PreparedStatement psR = conn.prepareStatement(
                             "INSERT INTO ventas_rapidas (fecha, nombre, cantidad, precio_unitario, subtotal, tipo_pago, grupo_venta_id) "
                             + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
-
                         psR.setDate(1, hoy);
                         psR.setString(2, nombreRapido);
                         psR.setInt(3, cantidad);
                         psR.setDouble(4, precioUnit);
                         psR.setDouble(5, precioUnit * cantidad);
                         psR.setString(6, tipoPago);
-
                         if (ventaId > 0) {
                             psR.setInt(7, ventaId);
                         } else {
                             psR.setNull(7, Types.INTEGER);
                         }
-
                         psR.executeUpdate();
+                    }
+
+                    for (RecetaItem item : recetaDAO.obtenerPorNombre(nombreRapido)) {
+                        invDAO.descontarStock(item.getIdIngrediente(), item.getCantidadG() * cantidad);
                     }
                 }
             }
 
             conn.commit();
             Conexion.invalidateCache(CACHE_PREFIX);
+            notificar();
             return true;
 
         } catch (SQLException e) {
@@ -347,6 +358,7 @@ public class VentaDAO {
             try {
                 if (conn != null) {
                     conn.rollback();
+
                 }
             } catch (SQLException ex) {
                 ex.printStackTrace();
@@ -583,8 +595,8 @@ public class VentaDAO {
                     String tipo = rsLiq.getString("tipo_pago_liquidacion");
                     double monto = rsLiq.getDouble(1);
                     if ("EFECTIVO".equals(tipo)) {
-                        liquidadoEfectivo += monto; 
-                    }else if ("TRANSFERENCIA".equals(tipo)) {
+                        liquidadoEfectivo += monto;
+                    } else if ("TRANSFERENCIA".equals(tipo)) {
                         liquidadoTransferencia += monto;
                     }
                 }
@@ -823,6 +835,7 @@ public class VentaDAO {
 
             conn.commit();
             Conexion.invalidateCache(CACHE_PREFIX);
+            notificar();
             return true;
 
         } catch (SQLException e) {
