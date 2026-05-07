@@ -9,6 +9,9 @@ import dao.RecetaItem;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +23,8 @@ public class PedidosServer {
     private final PedidosDAO    pedidosDAO = new PedidosDAO();
     private final RecetaDAO     recetaDAO  = new RecetaDAO();
     private final InventarioDAO invDAO     = new InventarioDAO();
+
+    private final Object pedidoLock = new Object();
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT")) : 8888;
@@ -49,59 +54,66 @@ public class PedidosServer {
             }
 
             if ("POST".equals(exchange.getRequestMethod())) {
-                try {
-                    String body = readBody(exchange);
-                    System.out.println("[PEDIDOS] Body recibido: " + body);
+                String body = readBody(exchange);
+                System.out.println("[PEDIDOS] Body recibido: " + body);
 
-                    String cliente  = sanitizar(extraerValor(body, "cliente"));
-                    String telefono = sanitizar(extraerValor(body, "telefono"));
-                    String detalle  = sanitizar(extraerValor(body, "detalle"));
-                    double total    = extraerDouble(body, "total");
+                synchronized (pedidoLock) {
+                    try {
+                        String cliente  = sanitizar(extraerValor(body, "cliente"));
+                        String telefono = sanitizar(extraerValor(body, "telefono"));
+                        String detalle  = sanitizar(extraerValor(body, "detalle"));
+                        double total    = extraerDouble(body, "total");
 
-                    String tipoPago = extraerValor(body, "tipoPago");
-                    if ("-".equals(tipoPago) || tipoPago.isBlank()) tipoPago = "EFECTIVO";
+                        String tipoPago = extraerValor(body, "tipoPago");
+                        if ("-".equals(tipoPago) || tipoPago.isBlank()) tipoPago = "EFECTIVO";
 
-                    String categorias = extraerCategoriasDeLosItems(body);
-                    System.out.println("CATEGORIAS DETECTADAS: " + categorias);
+                        // ── Detección de duplicados ───────────────────────
+                        if (esPedidoDuplicado(cliente, detalle)) {
+                            System.out.println("[PEDIDOS] Duplicado detectado para: " + cliente);
+                            enviarRespuesta(exchange, 200,
+                                    "{\"exito\":true,\"numero\":0,\"duplicado\":true}");
+                            return;
+                        }
 
-                    String franja = calcularFranjaActual(detalle, categorias);
-                    System.out.println("FRANJA CALCULADA: " + franja);
+                        String categorias = extraerCategoriasDeLosItems(body);
+                        System.out.println("CATEGORIAS DETECTADAS: " + categorias);
 
-                    if ("FUERA HORARIO".equals(franja)) {
-                        enviarRespuesta(exchange, 403,
-                                "{\"exito\":false,\"error\":\"Pedido fuera de horario permitido\"}");
-                        return;
+                        String franja = calcularFranjaActual(detalle, categorias);
+                        System.out.println("FRANJA CALCULADA: " + franja);
+
+                        if ("FUERA HORARIO".equals(franja)) {
+                            enviarRespuesta(exchange, 403,
+                                    "{\"exito\":false,\"error\":\"Pedido fuera de horario permitido\"}");
+                            return;
+                        }
+
+                        String fechaEntrega = extraerValor(body, "fecha_entrega");
+                        if ("-".equals(fechaEntrega) || fechaEntrega.isBlank()) fechaEntrega = null;
+
+                        String categoriasDetalle = construirCategoriasDetalle(body);
+                        System.out.println("[PEDIDOS] categoriasDetalle: " + categoriasDetalle);
+
+                        int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
+                                cliente, telefono, detalle, total, franja, "WEB",
+                                fechaEntrega, categoriasDetalle);
+
+                        System.out.println("[PEDIDOS] Resultado: id=" + resultado[0] + " num=" + resultado[1]);
+
+                        int id           = resultado[0];
+                        int numeroPedido = resultado[1];
+
+                        if (id > 0) descontarInventarioDesdeItems(body);
+
+                        enviarRespuesta(exchange, 200, "{"
+                                + "\"exito\":true,"
+                                + "\"id\":"     + id           + ","
+                                + "\"numero\":" + numeroPedido + "}");
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        enviarRespuesta(exchange, 400, "{\"exito\":false}");
                     }
-
-                    String fechaEntrega = extraerValor(body, "fecha_entrega");
-                    if ("-".equals(fechaEntrega) || fechaEntrega.isBlank()) fechaEntrega = null;
-
-                    // ── Resumen de categorías para el reporte ─────────────
-                    String categoriasDetalle = construirCategoriasDetalle(body);
-                    System.out.println("[PEDIDOS] categoriasDetalle: " + categoriasDetalle);
-
-                    // ── Guardar pedido ────────────────────────────────────
-                    int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
-                            cliente, telefono, detalle, total, franja, "WEB",
-                            fechaEntrega, categoriasDetalle);
-
-                    System.out.println("[PEDIDOS] Resultado: id=" + resultado[0] + " num=" + resultado[1]);
-
-                    int id           = resultado[0];
-                    int numeroPedido = resultado[1];
-
-                    // ── Descontar inventario ──────────────────────────────
-                    if (id > 0) descontarInventarioDesdeItems(body);
-
-                    enviarRespuesta(exchange, 200, "{"
-                            + "\"exito\":true,"
-                            + "\"id\":"     + id           + ","
-                            + "\"numero\":" + numeroPedido + "}");
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    enviarRespuesta(exchange, 400, "{\"exito\":false}");
-                }
+                } /
             }
         });
 
@@ -170,6 +182,29 @@ public class PedidosServer {
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
+    }
+
+    private boolean esPedidoDuplicado(String cliente, String detalle) {
+        String sql = "SELECT COUNT(*) FROM pedidos "
+                + "WHERE cliente = ? AND detalle = ? "
+                + "AND fecha_hora > NOW() - INTERVAL '15 seconds' "
+                + "AND origen = 'WEB'";
+        Connection conn = null;
+        try {
+            conn = dao.Conexion.conectar();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, cliente);
+                ps.setString(2, detalle);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() && rs.getInt(1) > 0;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[PEDIDOS] Error verificando duplicado: " + e.getMessage());
+            return false; // ante la duda, dejar pasar
+        } finally {
+            if (conn != null) dao.Conexion.devolver(conn);
+        }
     }
 
     private String construirCategoriasDetalle(String json) {
