@@ -5,41 +5,32 @@ import java.util.*;
 
 public class AdminDAO {
 
+    // ── Logs ─────────────────────────────────────────────────────────────────
     public void registrarLog(String ip, String metodo, String endpoint,
             int statusCode, String userAgent, String correo) {
-
         String sql = "INSERT INTO request_logs (ip, metodo, endpoint, status_code, user_agent, correo) "
                 + "VALUES (?, ?, ?, ?, ?, ?)";
-
-        try (Connection conn = Conexion.conectar();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, ip);
             ps.setString(2, metodo);
             ps.setString(3, endpoint);
             ps.setInt(4, statusCode);
-            ps.setString(5, userAgent != null ? userAgent.substring(0, Math.min(userAgent.length(), 500)) : null);
+            ps.setString(5, userAgent != null
+                    ? userAgent.substring(0, Math.min(userAgent.length(), 500)) : null);
             ps.setString(6, correo);
-
             ps.executeUpdate();
-
         } catch (SQLException e) {
-            System.err.println("Error registrando log: " + e.getMessage());
+            System.err.println("[AdminDAO] Error registrando log: " + e.getMessage());
         }
     }
 
     public List<Map<String, Object>> obtenerLogs(int limite) {
         String sql = "SELECT id, ip, metodo, endpoint, status_code, correo, timestamp "
                 + "FROM request_logs ORDER BY timestamp DESC LIMIT ?";
-
         List<Map<String, Object>> lista = new ArrayList<>();
-
-        try (Connection conn = Conexion.conectar();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, limite);
             ResultSet rs = ps.executeQuery();
-
             while (rs.next()) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("id", rs.getInt("id"));
@@ -51,157 +42,159 @@ public class AdminDAO {
                 row.put("timestamp", rs.getString("timestamp"));
                 lista.add(row);
             }
-
         } catch (SQLException e) {
-            System.err.println("Error obteniendo logs: " + e.getMessage());
+            System.err.println("[AdminDAO] Error obteniendo logs: " + e.getMessage());
         }
-
         return lista;
     }
 
-    public void bloquearIP(String ip, String razon) {
-        String sql = "INSERT INTO ip_bloqueadas (ip, razon, fecha_bloqueo, desbloqueada) "
-                + "VALUES (?, ?, NOW(), false)";
-
-        try (Connection conn = Conexion.conectar();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
+    // ── IPs bloqueadas ────────────────────────────────────────────────────────
+    public void bloquearIPManual(String ip, String razon) {
+        String sql = "INSERT INTO ip_bloqueadas (ip, razon, permanente, desbloqueada, fecha_bloqueo) "
+                + "VALUES (?, ?, TRUE, FALSE, NOW()) "
+                + "ON CONFLICT (ip) DO UPDATE SET "
+                + "  razon         = EXCLUDED.razon, "
+                + "  permanente    = TRUE, "
+                + "  desbloqueada  = FALSE, "
+                + "  reincidencias = ip_bloqueadas.reincidencias + 1, "
+                + "  fecha_bloqueo = NOW()";
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, ip);
-            ps.setString(2, razon);
+            ps.setString(2, razon != null ? razon : "Bloqueo manual desde panel");
             ps.executeUpdate();
-
         } catch (SQLException e) {
-            System.err.println("Error bloqueando IP: " + e.getMessage());
+            System.err.println("[AdminDAO] Error bloqueando IP: " + e.getMessage());
+        }
+    }
+
+    public void bloquearIPTemporal(String ip, String razon, java.time.LocalDateTime hasta) {
+        String sql = "INSERT INTO ip_bloqueadas (ip, razon, permanente, desbloqueada, bloqueada_hasta, fecha_bloqueo) "
+                + "VALUES (?, ?, FALSE, FALSE, ?, NOW()) "
+                + "ON CONFLICT (ip) DO UPDATE SET "
+                + "  razon         = EXCLUDED.razon, "
+                + "  desbloqueada  = FALSE, "
+                + "  bloqueada_hasta = EXCLUDED.bloqueada_hasta, "
+                + "  reincidencias = ip_bloqueadas.reincidencias + 1, "
+                + "  fecha_bloqueo = NOW()";
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, ip);
+            ps.setString(2, razon != null ? razon : "Throttling automático");
+            ps.setTimestamp(3, java.sql.Timestamp.valueOf(hasta));
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("[AdminDAO] Error bloqueando IP temporal: " + e.getMessage());
+        }
+    }
+
+    public void desbloquearIP(String ip) {
+        String sql = "UPDATE ip_bloqueadas SET desbloqueada=TRUE WHERE ip=?";
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, ip);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("[AdminDAO] Error desbloqueando IP: " + e.getMessage());
         }
     }
 
     public boolean estaBloqueada(String ip) {
-        String sql = "SELECT 1 FROM ip_bloqueadas WHERE ip=? AND desbloqueada=false LIMIT 1";
-
-        try (Connection conn = Conexion.conectar();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
+        String sql = "SELECT 1 FROM ip_bloqueadas "
+                + "WHERE ip=? AND desbloqueada=FALSE "
+                + "AND (permanente=TRUE OR bloqueada_hasta > NOW()) LIMIT 1";
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, ip);
-            ResultSet rs = ps.executeQuery();
-
-            return rs.next();
-
+            return ps.executeQuery().next();
         } catch (SQLException e) {
-            System.err.println("Error verificando IP: " + e.getMessage());
+            System.err.println("[AdminDAO] Error verificando IP: " + e.getMessage());
+            return false;
         }
-
-        return false;
     }
 
     public List<Map<String, Object>> obtenerIPsBloqueadas() {
-        String sql = "SELECT ip, razon, fecha_bloqueo FROM ip_bloqueadas WHERE desbloqueada=false ORDER BY fecha_bloqueo DESC";
-
+        String sql = "SELECT ip, razon, reincidencias, permanente, desbloqueada, "
+                + "bloqueada_hasta, fecha_bloqueo "
+                + "FROM ip_bloqueadas ORDER BY fecha_bloqueo DESC";
         List<Map<String, Object>> lista = new ArrayList<>();
-
-        try (Connection conn = Conexion.conectar();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("ip", rs.getString("ip"));
                 row.put("razon", rs.getString("razon"));
+                row.put("reincidencias", rs.getInt("reincidencias"));
+                row.put("permanente", rs.getBoolean("permanente"));
+                row.put("desbloqueada", rs.getBoolean("desbloqueada"));
+                row.put("bloqueada_hasta", rs.getString("bloqueada_hasta"));
                 row.put("fecha_bloqueo", rs.getString("fecha_bloqueo"));
                 lista.add(row);
             }
-
         } catch (SQLException e) {
-            System.err.println("Error obteniendo IPs bloqueadas: " + e.getMessage());
+            System.err.println("[AdminDAO] Error obteniendo IPs bloqueadas: " + e.getMessage());
         }
-
         return lista;
     }
 
     public List<Map<String, Object>> obtenerTopIPs(int limite) {
-        String sql = "SELECT ip, COUNT(*) as total "
-                + "FROM request_logs GROUP BY ip ORDER BY total DESC LIMIT ?";
-
+        String sql = "SELECT ip, "
+                + "  COUNT(*) AS total, "
+                + "  COUNT(*) FILTER (WHERE DATE(timestamp)=CURRENT_DATE) AS hoy "
+                + "FROM request_logs "
+                + "GROUP BY ip ORDER BY total DESC LIMIT ?";
         List<Map<String, Object>> lista = new ArrayList<>();
-
-        try (Connection conn = Conexion.conectar();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, limite);
             ResultSet rs = ps.executeQuery();
-
             while (rs.next()) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("ip", rs.getString("ip"));
-                row.put("total", rs.getInt("total"));
+                row.put("total", rs.getLong("total"));
+                row.put("hoy", rs.getLong("hoy"));
                 lista.add(row);
             }
-
         } catch (SQLException e) {
-            System.err.println("Error top IPs: " + e.getMessage());
+            System.err.println("[AdminDAO] Error top IPs: " + e.getMessage());
         }
-
         return lista;
     }
 
-    public void bloquearIPManual(String ip, String razon) {
-        bloquearIP(ip, razon != null ? razon : "Bloqueo manual");
-    }
-
-    public void desbloquearIP(String ip) {
-        String sql = "UPDATE ip_bloqueadas SET desbloqueada=true WHERE ip=?";
-
-        try (Connection conn = Conexion.conectar();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setString(1, ip);
-            ps.executeUpdate();
-
-        } catch (SQLException e) {
-            System.err.println("Error desbloqueando IP: " + e.getMessage());
-        }
-    }
-
     public void registrarOActualizarUsuario(String correo, String nombre, String ip) {
-        if (correo == null || correo.isBlank()) return;
-
+        if (correo == null || correo.isBlank()) {
+            return;
+        }
         try (Connection conn = Conexion.conectar()) {
 
-            PreparedStatement ins = conn.prepareStatement(
+            try (PreparedStatement ins = conn.prepareStatement(
                     "INSERT INTO usuarios_web (correo, nombre, ip_ultimo) "
-                    + "VALUES (?, ?, ?) ON CONFLICT (correo) DO NOTHING");
+                    + "VALUES (?, ?, ?) ON CONFLICT (correo) DO NOTHING")) {
+                ins.setString(1, correo.trim().toLowerCase());
+                ins.setString(2, nombre);
+                ins.setString(3, ip);
+                ins.executeUpdate();
+            }
 
-            ins.setString(1, correo.trim().toLowerCase());
-            ins.setString(2, nombre);
-            ins.setString(3, ip);
-            ins.executeUpdate();
-
-            PreparedStatement upd = conn.prepareStatement(
-                    "UPDATE usuarios_web SET total_pedidos=total_pedidos+1, "
-                    + "ultimo_pedido=NOW(), ip_ultimo=?, "
-                    + "nombre=COALESCE(?, nombre) WHERE correo=?");
-
-            upd.setString(1, ip);
-            upd.setString(2, nombre);
-            upd.setString(3, correo.trim().toLowerCase());
-            upd.executeUpdate();
-
+            try (PreparedStatement upd = conn.prepareStatement(
+                    "UPDATE usuarios_web SET "
+                    + "  total_pedidos = total_pedidos + 1, "
+                    + "  ultimo_pedido = NOW(), "
+                    + "  ip_ultimo     = ?, "
+                    + "  nombre        = COALESCE(?, nombre) "
+                    + "WHERE correo = ?")) {
+                upd.setString(1, ip);
+                upd.setString(2, nombre);
+                upd.setString(3, correo.trim().toLowerCase());
+                upd.executeUpdate();
+            }
         } catch (SQLException e) {
-            System.err.println("Error usuario: " + e.getMessage());
+            System.err.println("[AdminDAO] Error usuario OAuth: " + e.getMessage());
         }
     }
 
     public List<Map<String, Object>> obtenerUsuarios(int limite) {
-        String sql = "SELECT correo, nombre, ip_ultimo, total_pedidos, primer_pedido, ultimo_pedido "
+        String sql = "SELECT correo, nombre, ip_ultimo, total_pedidos, "
+                + "primer_pedido, ultimo_pedido "
                 + "FROM usuarios_web ORDER BY ultimo_pedido DESC LIMIT ?";
-
         List<Map<String, Object>> lista = new ArrayList<>();
-
-        try (Connection conn = Conexion.conectar();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
+        try (Connection conn = Conexion.conectar(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, limite);
             ResultSet rs = ps.executeQuery();
-
             while (rs.next()) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("correo", rs.getString("correo"));
@@ -212,45 +205,44 @@ public class AdminDAO {
                 row.put("ultimo_pedido", rs.getString("ultimo_pedido"));
                 lista.add(row);
             }
-
         } catch (SQLException e) {
-            System.err.println("Error usuarios: " + e.getMessage());
+            System.err.println("[AdminDAO] Error usuarios: " + e.getMessage());
         }
-
         return lista;
     }
 
     public Map<String, Object> obtenerEstadisticas() {
-
         Map<String, Object> stats = new LinkedHashMap<>();
-
         try (Connection conn = Conexion.conectar()) {
-
-            stats.put("requests_hoy", queryLong(conn, "SELECT COUNT(*) FROM request_logs WHERE DATE(timestamp)=CURRENT_DATE"));
-            stats.put("requests_total", queryLong(conn, "SELECT COUNT(*) FROM request_logs"));
-            stats.put("ips_unicas_hoy", queryLong(conn, "SELECT COUNT(DISTINCT ip) FROM request_logs WHERE DATE(timestamp)=CURRENT_DATE"));
-            stats.put("pedidos_hoy", queryLong(conn, "SELECT COUNT(*) FROM request_logs WHERE endpoint='/api/pedidos' AND metodo='POST' AND status_code=200 AND DATE(timestamp)=CURRENT_DATE"));
-            stats.put("usuarios_total", queryLong(conn, "SELECT COUNT(*) FROM usuarios_web"));
-            stats.put("ips_bloqueadas", queryLong(conn, "SELECT COUNT(*) FROM ip_bloqueadas WHERE desbloqueada=false"));
-            stats.put("ventas_hoy", queryDouble(conn, "SELECT COALESCE(SUM(precio_unitario*cantidad),0) FROM ventas_rapidas WHERE DATE(fecha)=CURRENT_DATE"));
-
+            stats.put("requests_hoy", queryLong(conn,
+                    "SELECT COUNT(*) FROM request_logs WHERE DATE(timestamp)=CURRENT_DATE"));
+            stats.put("requests_total", queryLong(conn,
+                    "SELECT COUNT(*) FROM request_logs"));
+            stats.put("ips_unicas_hoy", queryLong(conn,
+                    "SELECT COUNT(DISTINCT ip) FROM request_logs WHERE DATE(timestamp)=CURRENT_DATE"));
+            stats.put("pedidos_hoy", queryLong(conn,
+                    "SELECT COUNT(*) FROM pedidos WHERE DATE(fecha_hora)=CURRENT_DATE AND origen='WEB'"));
+            stats.put("usuarios_total", queryLong(conn,
+                    "SELECT COUNT(*) FROM usuarios_web"));
+            stats.put("ips_bloqueadas", queryLong(conn,
+                    "SELECT COUNT(*) FROM ip_bloqueadas WHERE desbloqueada=FALSE"));
+            stats.put("ventas_hoy", queryDouble(conn,
+                    "SELECT COALESCE(SUM(total),0) FROM pedidos "
+                    + "WHERE DATE(fecha_hora)=CURRENT_DATE AND estado != 'CANCELADO'"));
         } catch (SQLException e) {
-            System.err.println("Error stats: " + e.getMessage());
+            System.err.println("[AdminDAO] Error stats: " + e.getMessage());
         }
-
         return stats;
     }
 
     private long queryLong(Connection conn, String sql) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             return rs.next() ? rs.getLong(1) : 0;
         }
     }
 
     private double queryDouble(Connection conn, String sql) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             return rs.next() ? rs.getDouble(1) : 0;
         }
     }
