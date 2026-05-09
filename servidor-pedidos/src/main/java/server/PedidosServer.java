@@ -31,8 +31,15 @@ public class PedidosServer {
 
     private HttpServer servidor;
 
+    // ── Throttling por IP ─────────────────────────────────────────────────────
+    private static final long VENTANA_MS       = 10_000L;       // 10 seg entre pedidos
+    private static final int  MAX_PEDIDOS_HORA = 5;             // máx pedidos por hora
+    private static final long HORA_MS          = 60 * 60 * 1000L;
+    private static final long BLOQUEO_MS       = 30 * 60 * 1000L; // bloqueo 30 min
+
     private final Map<String, Long>    ultimoPedidoPorIp = new ConcurrentHashMap<>();
     private final Map<String, Integer> contadorPorIp     = new ConcurrentHashMap<>();
+    private final Map<String, Long>    bloqueadoHasta    = new ConcurrentHashMap<>();
 
     private static class ItemCarrito {
         String nombre;
@@ -54,6 +61,14 @@ public class PedidosServer {
             }
 
             if ("POST".equals(exchange.getRequestMethod())) {
+
+                String errorThrottle = verificarThrottle(exchange);
+                if (errorThrottle != null) {
+                    enviarRespuesta(exchange, 429, errorThrottle);
+                    return;
+                }
+                // ─────────────────────────────────────────────────────────
+
                 String body = readBody(exchange);
                 System.out.println("[PEDIDOS] Body recibido: " + body);
 
@@ -113,7 +128,7 @@ public class PedidosServer {
                         e.printStackTrace();
                         enviarRespuesta(exchange, 400, "{\"exito\":false}");
                     }
-                } 
+                }
             }
         });
 
@@ -184,6 +199,67 @@ public class PedidosServer {
         System.out.println("Servidor OK puerto " + PUERTO);
     }
 
+    private String obtenerIp(HttpExchange exchange) {
+        String forwarded = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return exchange.getRemoteAddress().getAddress().getHostAddress();
+    }
+
+    private String verificarThrottle(HttpExchange exchange) {
+        String ip  = obtenerIp(exchange);
+        long ahora = System.currentTimeMillis();
+
+        // Regla 3: ¿está bloqueada la IP?
+        Long bloqueado = bloqueadoHasta.get(ip);
+        if (bloqueado != null && ahora < bloqueado) {
+            long minutosRestantes = (bloqueado - ahora) / 60_000 + 1;
+            System.out.println("[THROTTLE] IP bloqueada rechazada: " + ip
+                    + " (" + minutosRestantes + " min restantes)");
+            return "{\"exito\":false,\"error\":\"Demasiados intentos. "
+                    + "Reintenta en " + minutosRestantes + " minutos.\"}";
+        } else if (bloqueado != null) {
+            // Bloqueo expirado → limpiar estado
+            bloqueadoHasta.remove(ip);
+            contadorPorIp.remove(ip);
+            ultimoPedidoPorIp.remove(ip);
+        }
+
+        // Regla 1: ventana mínima de 10 segundos entre pedidos
+        Long ultimo = ultimoPedidoPorIp.get(ip);
+        if (ultimo != null && (ahora - ultimo) < VENTANA_MS) {
+            long segsRestantes = (VENTANA_MS - (ahora - ultimo)) / 1000 + 1;
+            System.out.println("[THROTTLE] Ventana activa para IP: " + ip
+                    + " (" + segsRestantes + "s restantes)");
+            return "{\"exito\":false,\"error\":\"Espera " + segsRestantes
+                    + " segundos antes de enviar otro pedido.\"}";
+        }
+
+        // Regla 2: máximo 5 pedidos por hora
+        // Si el último pedido fue hace más de 1 hora, resetear contador
+        int contador = contadorPorIp.getOrDefault(ip, 0);
+        if (ultimo != null && (ahora - ultimo) >= HORA_MS) {
+            contador = 0;
+            contadorPorIp.put(ip, 0);
+        }
+
+        if (contador >= MAX_PEDIDOS_HORA) {
+            // Bloquear 30 minutos
+            bloqueadoHasta.put(ip, ahora + BLOQUEO_MS);
+            System.out.println("[THROTTLE] IP bloqueada 30min por exceso de pedidos: " + ip);
+            return "{\"exito\":false,\"error\":\"Demasiados pedidos. "
+                    + "IP bloqueada durante 30 minutos.\"}";
+        }
+
+        // Todo OK → registrar este pedido
+        ultimoPedidoPorIp.put(ip, ahora);
+        contadorPorIp.put(ip, contador + 1);
+        System.out.println("[THROTTLE] IP " + ip + " → pedido #" + (contador + 1)
+                + " en la ventana horaria");
+        return null; 
+    }
+
     private boolean esPedidoDuplicado(String cliente, String detalle) {
         String sql = "SELECT COUNT(*) FROM pedidos "
                 + "WHERE cliente = ? AND detalle = ? "
@@ -201,7 +277,7 @@ public class PedidosServer {
             }
         } catch (Exception e) {
             System.out.println("[PEDIDOS] Error verificando duplicado: " + e.getMessage());
-            return false; // ante la duda, dejar pasar
+            return false;
         } finally {
             if (conn != null) dao.Conexion.devolver(conn);
         }
