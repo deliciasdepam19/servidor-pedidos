@@ -57,6 +57,34 @@ public class PedidosServer {
 
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
+         // ── GET /api/pedidos/historico ────────────────────────────────────────
+        servidor.createContext("/api/pedidos/historico", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("GET".equals(exchange.getRequestMethod())) {
+                List<PedidosDAO.PedidoBD> pedidos = pedidosDAO.cargarPedidosDeHoy();
+                StringBuilder json = new StringBuilder("[");
+                for (int i = 0; i < pedidos.size(); i++) {
+                    PedidosDAO.PedidoBD p = pedidos.get(i);
+                    json.append("{")
+                            .append("\"id\":").append(p.id).append(",")
+                            .append("\"numero\":").append(p.numero).append(",")
+                            .append("\"numeroFormateado\":\"")
+                            .append(PedidosDAO.formatearNumero(p.numero, p.origen)).append("\",")
+                            .append("\"cliente\":\"").append(escaparJson(p.cliente)).append("\",")
+                            .append("\"telefono\":\"").append(escaparJson(p.telefono)).append("\",")
+                            .append("\"detalle\":\"").append(escaparJson(p.detalle)).append("\",")
+                            .append("\"total\":").append(p.total).append(",")
+                            .append("\"estado\":\"").append(p.estado).append("\",")
+                            .append("\"franja\":\"").append(p.franja).append("\",")
+                            .append("\"timestamp\":\"").append(obtenerHoraExacta()).append("\"")
+                            .append("}");
+                    if (i < pedidos.size() - 1) json.append(",");
+                }
+                json.append("]");
+                enviarRespuesta(exchange, 200, json.toString());
+            }
+        });
+
         // ── POST /api/pedidos ─────────────────────────────────────────────────
         servidor.createContext("/api/pedidos", exchange -> {
             agregarCorsHeaders(exchange);
@@ -122,34 +150,6 @@ public class PedidosServer {
                         enviarRespuesta(exchange, 400, "{\"exito\":false}");
                     }
                 }
-            }
-        });
-
-        // ── GET /api/pedidos/historico ────────────────────────────────────────
-        servidor.createContext("/api/pedidos/historico", exchange -> {
-            agregarCorsHeaders(exchange);
-            if ("GET".equals(exchange.getRequestMethod())) {
-                List<PedidosDAO.PedidoBD> pedidos = pedidosDAO.cargarPedidosDeHoy();
-                StringBuilder json = new StringBuilder("[");
-                for (int i = 0; i < pedidos.size(); i++) {
-                    PedidosDAO.PedidoBD p = pedidos.get(i);
-                    json.append("{")
-                            .append("\"id\":").append(p.id).append(",")
-                            .append("\"numero\":").append(p.numero).append(",")
-                            .append("\"numeroFormateado\":\"")
-                            .append(PedidosDAO.formatearNumero(p.numero, p.origen)).append("\",")
-                            .append("\"cliente\":\"").append(escaparJson(p.cliente)).append("\",")
-                            .append("\"telefono\":\"").append(escaparJson(p.telefono)).append("\",")
-                            .append("\"detalle\":\"").append(escaparJson(p.detalle)).append("\",")
-                            .append("\"total\":").append(p.total).append(",")
-                            .append("\"estado\":\"").append(p.estado).append("\",")
-                            .append("\"franja\":\"").append(p.franja).append("\",")
-                            .append("\"timestamp\":\"").append(obtenerHoraExacta()).append("\"")
-                            .append("}");
-                    if (i < pedidos.size() - 1) json.append(",");
-                }
-                json.append("]");
-                enviarRespuesta(exchange, 200, json.toString());
             }
         });
 
