@@ -442,8 +442,8 @@ public class VentaDAO {
                         if (tipo != null) {
                             String t = tipo.toLowerCase().trim();
                             if (t.contains("empanada")) {
-                                result[0] += total; 
-                            }else if (t.contains("sopaipilla")) {
+                                result[0] += total;
+                            } else if (t.contains("sopaipilla")) {
                                 result[1] += total;
                             }
                         }
@@ -489,10 +489,10 @@ public class VentaDAO {
                                 continue;
                             }
                             if (cat.contains("empanada")) {
-                                result[0] += cant; 
-                            }else if (cat.contains("sopaipilla")) {
-                                result[1] += cant; 
-                            }else {
+                                result[0] += cant;
+                            } else if (cat.contains("sopaipilla")) {
+                                result[1] += cant;
+                            } else {
                                 result[2] += cant;
                             }
                         }
@@ -660,13 +660,13 @@ public class VentaDAO {
             // ── Eliminar ventas del día ───────────────────────────────────────────
             try (PreparedStatement psDel1 = conn.prepareStatement(
                     "DELETE FROM detalle_ventas WHERE venta_id IN "
-                    + "(SELECT id FROM ventas WHERE fecha::date = ?)")) {
+                    + "(SELECT id FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE')")) {
                 psDel1.setDate(1, java.sql.Date.valueOf(fecha));
                 psDel1.executeUpdate();
             }
 
             try (PreparedStatement psDel2 = conn.prepareStatement(
-                    "DELETE FROM ventas WHERE fecha::date = ?")) {
+                    "DELETE FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE'")) {
                 psDel2.setDate(1, java.sql.Date.valueOf(fecha));
                 psDel2.executeUpdate();
             }
@@ -676,7 +676,6 @@ public class VentaDAO {
                 psDel3.setDate(1, java.sql.Date.valueOf(fecha));
                 psDel3.executeUpdate();
             }
-
             conn.commit();
             Conexion.invalidateCache(CACHE_PREFIX);
             return 1;
