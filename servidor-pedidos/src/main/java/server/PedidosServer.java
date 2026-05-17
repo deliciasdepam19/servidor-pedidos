@@ -2,11 +2,13 @@ package server;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+
 import dao.AdminDAO;
 import dao.InventarioDAO;
 import dao.PedidosDAO;
 import dao.RecetaDAO;
 import dao.RecetaItem;
+
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -18,46 +20,49 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Exchanger;
 
 public class PedidosServer {
 
-    private final PedidosDAO    pedidosDAO = new PedidosDAO();
-    private final RecetaDAO     recetaDAO  = new RecetaDAO();
-    private final InventarioDAO invDAO     = new InventarioDAO();
-    private final AdminDAO      adminDAO   = new AdminDAO();
+    private final PedidosDAO pedidosDAO = new PedidosDAO();
+    private final RecetaDAO recetaDAO = new RecetaDAO();
+    private final InventarioDAO invDAO = new InventarioDAO();
+    private final AdminDAO adminDAO = new AdminDAO();
 
     private final Object pedidoLock = new Object();
+    public static volatile boolean webAbierta = true;
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT")) : 8888;
 
-    private static final String ADMIN_USER = System.getenv("ADMIN_USER") != null
+    public static final String ADMIN_USER = System.getenv("ADMIN_USER") != null
             ? System.getenv("ADMIN_USER") : "admin";
-    private static final String ADMIN_PASS = System.getenv("ADMIN_PASS") != null
+    public static final String ADMIN_PASS = System.getenv("ADMIN_PASS") != null
             ? System.getenv("ADMIN_PASS") : "";
 
     private HttpServer servidor;
-    
-    private static final long VENTANA_MS       = 10_000L;
-    private static final int  MAX_PEDIDOS_HORA = 5;
-    private static final long HORA_MS          = 60 * 60 * 1000L;
-    private static final long BLOQUEO_MS       = 30 * 60 * 1000L;
 
-    private final Map<String, Long>    ultimoPedidoPorIp = new ConcurrentHashMap<>();
-    private final Map<String, Integer> contadorPorIp     = new ConcurrentHashMap<>();
-    private final Map<String, Long>    bloqueadoHasta    = new ConcurrentHashMap<>();
+    private static final long VENTANA_MS = 10_000L;
+    private static final int MAX_PEDIDOS_HORA = 5;
+    private static final long HORA_MS = 60 * 60 * 1000L;
+    private static final long BLOQUEO_MS = 30 * 60 * 1000L;
+
+    private final Map<String, Long> ultimoPedidoPorIp = new ConcurrentHashMap<>();
+    private final Map<String, Integer> contadorPorIp = new ConcurrentHashMap<>();
+    private final Map<String, Long> bloqueadoHasta = new ConcurrentHashMap<>();
 
     private static class ItemCarrito {
+
         String nombre;
         String categoria;
-        int    cantidad;
+        int cantidad;
     }
 
     public PedidosServer() throws IOException {
 
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
-         // ── GET /api/pedidos/historico ────────────────────────────────────────
+        // ── GET /api/pedidos/historico ────────────────────────────────────────
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
@@ -78,7 +83,9 @@ public class PedidosServer {
                             .append("\"franja\":\"").append(p.franja).append("\",")
                             .append("\"timestamp\":\"").append(obtenerHoraExacta()).append("\"")
                             .append("}");
-                    if (i < pedidos.size() - 1) json.append(",");
+                    if (i < pedidos.size() - 1) {
+                        json.append(",");
+                    }
                 }
                 json.append("]");
                 enviarRespuesta(exchange, 200, json.toString());
@@ -102,13 +109,15 @@ public class PedidosServer {
                 System.out.println("[PEDIDOS] Body recibido: " + body);
                 synchronized (pedidoLock) {
                     try {
-                        String cliente  = sanitizar(extraerValor(body, "cliente"));
+                        String cliente = sanitizar(extraerValor(body, "cliente"));
                         String telefono = sanitizar(extraerValor(body, "telefono"));
-                        String detalle  = sanitizar(extraerValor(body, "detalle"));
-                        double total    = extraerDouble(body, "total");
+                        String detalle = sanitizar(extraerValor(body, "detalle"));
+                        double total = extraerDouble(body, "total");
 
                         String tipoPago = extraerValor(body, "tipoPago");
-                        if ("-".equals(tipoPago) || tipoPago.isBlank()) tipoPago = "EFECTIVO";
+                        if ("-".equals(tipoPago) || tipoPago.isBlank()) {
+                            tipoPago = "EFECTIVO";
+                        }
 
                         if (esPedidoDuplicado(cliente, detalle)) {
                             System.out.println("[PEDIDOS] Duplicado detectado para: " + cliente);
@@ -118,7 +127,7 @@ public class PedidosServer {
                         }
 
                         String categorias = extraerCategoriasDeLosItems(body);
-                        String franja     = calcularFranjaActual(detalle, categorias);
+                        String franja = calcularFranjaActual(detalle, categorias);
 
                         if ("FUERA HORARIO".equals(franja)) {
                             enviarRespuesta(exchange, 403,
@@ -127,7 +136,9 @@ public class PedidosServer {
                         }
 
                         String fechaEntrega = extraerValor(body, "fecha_entrega");
-                        if ("-".equals(fechaEntrega) || fechaEntrega.isBlank()) fechaEntrega = null;
+                        if ("-".equals(fechaEntrega) || fechaEntrega.isBlank()) {
+                            fechaEntrega = null;
+                        }
 
                         String categoriasDetalle = construirCategoriasDetalle(body);
 
@@ -135,14 +146,16 @@ public class PedidosServer {
                                 cliente, telefono, detalle, total, franja, "WEB",
                                 fechaEntrega, categoriasDetalle);
 
-                        int id           = resultado[0];
+                        int id = resultado[0];
                         int numeroPedido = resultado[1];
 
-                        if (id > 0) descontarInventarioDesdeItems(body);
+                        if (id > 0) {
+                            descontarInventarioDesdeItems(body);
+                        }
 
                         enviarRespuesta(exchange, 200, "{"
                                 + "\"exito\":true,"
-                                + "\"id\":"     + id           + ","
+                                + "\"id\":" + id + ","
                                 + "\"numero\":" + numeroPedido + "}");
 
                     } catch (Exception e) {
@@ -179,9 +192,9 @@ public class PedidosServer {
             }
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
-                    String body   = readBody(exchange);
+                    String body = readBody(exchange);
                     String nombre = sanitizar(extraerValor(body, "nombre"));
-                    String email  = sanitizar(extraerValor(body, "email"));
+                    String email = sanitizar(extraerValor(body, "email"));
                     System.out.println("Usuario: " + nombre + " / " + email);
                     enviarRespuesta(exchange, 200, "{\"exito\":true}");
                 } catch (Exception e) {
@@ -225,8 +238,10 @@ public class PedidosServer {
                 String query = exchange.getRequestURI().getQuery();
                 int limite = 200;
                 if (query != null && query.contains("limite=")) {
-                    try { limite = Integer.parseInt(query.split("limite=")[1].split("&")[0]); }
-                    catch (Exception ignored) {}
+                    try {
+                        limite = Integer.parseInt(query.split("limite=")[1].split("&")[0]);
+                    } catch (Exception ignored) {
+                    }
                 }
                 enviarRespuesta(exchange, 200, listOfMapsToJson(adminDAO.obtenerLogs(limite)));
             } catch (Exception e) {
@@ -250,15 +265,18 @@ public class PedidosServer {
                 if ("GET".equals(exchange.getRequestMethod())) {
                     Map<String, Object> resp = new LinkedHashMap<>();
                     resp.put("bloqueadas", adminDAO.obtenerIPsBloqueadas());
-                    resp.put("top_ips",    adminDAO.obtenerTopIPs(20));
+                    resp.put("top_ips", adminDAO.obtenerTopIPs(20));
                     enviarRespuesta(exchange, 200, mapToJson(resp));
                 } else if ("POST".equals(exchange.getRequestMethod())) {
-                    String body   = readBody(exchange);
-                    String ip     = extraerValor(body, "ip");
+                    String body = readBody(exchange);
+                    String ip = extraerValor(body, "ip");
                     String accion = extraerValor(body, "accion");
-                    String razon  = extraerValor(body, "razon");
-                    if ("bloquear".equals(accion))         adminDAO.bloquearIPManual(ip, razon);
-                    else if ("desbloquear".equals(accion)) adminDAO.desbloquearIP(ip);
+                    String razon = extraerValor(body, "razon");
+                    if ("bloquear".equals(accion)) {
+                        adminDAO.bloquearIPManual(ip, razon);
+                    } else if ("desbloquear".equals(accion)) {
+                        adminDAO.desbloquearIP(ip);
+                    }
                     enviarRespuesta(exchange, 200, "{\"ok\":true}");
                 }
             } catch (Exception e) {
@@ -286,12 +304,39 @@ public class PedidosServer {
             }
         });
 
+        servidor.createContext("/api/estado", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("GET".equals(exchange.getRequestMethod())) {
+                enviarRespuesta(exchange, 200, "{\"abierta\":" + webAbierta + "}");
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                if (!autenticado(exchange.getRequestHeaders().getFirst("Authorization"))) {
+                    exchange.sendResponseHeaders(401, -1);
+                    return;
+                }
+                String body = readBody(exchange);
+                String valor = extraerValor(body, "abierta");
+                webAbierta = "true".equals(valor);
+                System.out.println("[ESTADO WEB] → " + (webAbierta ? "ABIERTA" : "CERRADA"));
+                enviarRespuesta(exchange, 200, "{\"ok\":true,\"abierta\":" + webAbierta + "}");
+                return;
+            }
+            exchange.sendResponseHeaders(405, -1);
+        });
+
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
     }
 
     private boolean autenticado(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Basic ")) return false;
+        if (authHeader == null || !authHeader.startsWith("Basic ")) {
+            return false;
+        }
         try {
             String decoded = new String(java.util.Base64.getDecoder()
                     .decode(authHeader.substring(6)));
@@ -309,15 +354,23 @@ public class PedidosServer {
         StringBuilder sb = new StringBuilder("{");
         boolean first = true;
         for (Map.Entry<String, Object> e : map.entrySet()) {
-            if (!first) sb.append(",");
+            if (!first) {
+                sb.append(",");
+            }
             first = false;
             sb.append("\"").append(e.getKey()).append("\":");
             Object v = e.getValue();
-            if (v == null)                 sb.append("null");
-            else if (v instanceof Number)  sb.append(v);
-            else if (v instanceof Boolean) sb.append(v);
-            else if (v instanceof List)    sb.append(listOfMapsToJson((List<Map<String, Object>>) v));
-            else                           sb.append("\"").append(escaparJson(v.toString())).append("\"");
+            if (v == null) {
+                sb.append("null");
+            } else if (v instanceof Number) {
+                sb.append(v);
+            } else if (v instanceof Boolean) {
+                sb.append(v);
+            } else if (v instanceof List) {
+                sb.append(listOfMapsToJson((List<Map<String, Object>>) v));
+            } else {
+                sb.append("\"").append(escaparJson(v.toString())).append("\"");
+            }
         }
         return sb.append("}").toString();
     }
@@ -325,7 +378,9 @@ public class PedidosServer {
     private String listOfMapsToJson(List<Map<String, Object>> lista) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < lista.size(); i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0) {
+                sb.append(",");
+            }
             sb.append(mapToJson(lista.get(i)));
         }
         return sb.append("]").toString();
@@ -334,12 +389,14 @@ public class PedidosServer {
     // ── Throttling ────────────────────────────────────────────────────────────
     private String obtenerIp(HttpExchange exchange) {
         String forwarded = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) return forwarded.split(",")[0].trim();
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
         return exchange.getRemoteAddress().getAddress().getHostAddress();
     }
 
     private String verificarThrottle(HttpExchange exchange) {
-        String ip  = obtenerIp(exchange);
+        String ip = obtenerIp(exchange);
         long ahora = System.currentTimeMillis();
 
         Long bloqueado = bloqueadoHasta.get(ip);
@@ -347,7 +404,9 @@ public class PedidosServer {
             long min = (bloqueado - ahora) / 60_000 + 1;
             return "{\"exito\":false,\"error\":\"Demasiados intentos. Reintenta en " + min + " minutos.\"}";
         } else if (bloqueado != null) {
-            bloqueadoHasta.remove(ip); contadorPorIp.remove(ip); ultimoPedidoPorIp.remove(ip);
+            bloqueadoHasta.remove(ip);
+            contadorPorIp.remove(ip);
+            ultimoPedidoPorIp.remove(ip);
         }
 
         Long ultimo = ultimoPedidoPorIp.get(ip);
@@ -357,7 +416,10 @@ public class PedidosServer {
         }
 
         int contador = contadorPorIp.getOrDefault(ip, 0);
-        if (ultimo != null && (ahora - ultimo) >= HORA_MS) { contador = 0; contadorPorIp.put(ip, 0); }
+        if (ultimo != null && (ahora - ultimo) >= HORA_MS) {
+            contador = 0;
+            contadorPorIp.put(ip, 0);
+        }
 
         if (contador >= MAX_PEDIDOS_HORA) {
             bloqueadoHasta.put(ip, ahora + BLOQUEO_MS);
@@ -377,14 +439,19 @@ public class PedidosServer {
         try {
             conn = dao.Conexion.conectar();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, cliente); ps.setString(2, detalle);
-                try (ResultSet rs = ps.executeQuery()) { return rs.next() && rs.getInt(1) > 0; }
+                ps.setString(1, cliente);
+                ps.setString(2, detalle);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() && rs.getInt(1) > 0;
+                }
             }
         } catch (Exception e) {
             System.out.println("[PEDIDOS] Error verificando duplicado: " + e.getMessage());
             return false;
         } finally {
-            if (conn != null) dao.Conexion.devolver(conn);
+            if (conn != null) {
+                dao.Conexion.devolver(conn);
+            }
         }
     }
 
@@ -392,10 +459,14 @@ public class PedidosServer {
     private String construirCategoriasDetalle(String json) {
         List<ItemCarrito> items = extraerItems(json);
         Map<String, Integer> conteo = new LinkedHashMap<>();
-        for (ItemCarrito item : items) conteo.merge(normalizarCategoria(item.categoria), item.cantidad, Integer::sum);
+        for (ItemCarrito item : items) {
+            conteo.merge(normalizarCategoria(item.categoria), item.cantidad, Integer::sum);
+        }
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, Integer> e : conteo.entrySet()) {
-            if (sb.length() > 0) sb.append(",");
+            if (sb.length() > 0) {
+                sb.append(",");
+            }
             sb.append(e.getKey()).append(":").append(e.getValue());
         }
         return sb.toString();
@@ -419,11 +490,15 @@ public class PedidosServer {
     }
 
     private String normalizarCategoria(String cat) {
-        if (cat == null) return "rapido";
+        if (cat == null) {
+            return "rapido";
+        }
         cat = cat.toLowerCase().trim();
-        if (cat.endsWith("s") && !cat.equals("rapido")) cat = cat.substring(0, cat.length() - 1);
-        cat = cat.replace("á","a").replace("é","e").replace("í","i")
-                 .replace("ó","o").replace("ú","u").replace("ñ","n");
+        if (cat.endsWith("s") && !cat.equals("rapido")) {
+            cat = cat.substring(0, cat.length() - 1);
+        }
+        cat = cat.replace("á", "a").replace("é", "e").replace("í", "i")
+                .replace("ó", "o").replace("ú", "u").replace("ñ", "n");
         return cat.isEmpty() ? "rapido" : cat;
     }
 
@@ -431,21 +506,29 @@ public class PedidosServer {
         List<ItemCarrito> lista = new ArrayList<>();
         try {
             int inicio = json.indexOf("\"items\":");
-            if (inicio == -1) return lista;
+            if (inicio == -1) {
+                return lista;
+            }
             inicio = json.indexOf("[", inicio);
             int fin = json.indexOf("]", inicio);
-            if (inicio == -1 || fin == -1) return lista;
+            if (inicio == -1 || fin == -1) {
+                return lista;
+            }
             String itemsStr = json.substring(inicio + 1, fin);
             int i = 0;
             while ((i = itemsStr.indexOf("{", i)) != -1) {
                 int cierre = itemsStr.indexOf("}", i);
-                if (cierre == -1) break;
+                if (cierre == -1) {
+                    break;
+                }
                 String obj = itemsStr.substring(i, cierre + 1);
                 ItemCarrito item = new ItemCarrito();
-                item.nombre    = extraerValor(obj, "nombre");
+                item.nombre = extraerValor(obj, "nombre");
                 item.categoria = extraerValor(obj, "categoria");
-                item.cantidad  = (int) extraerDouble(obj, "cantidad");
-                if (item.nombre != null && !item.nombre.equals("-") && item.cantidad > 0) lista.add(item);
+                item.cantidad = (int) extraerDouble(obj, "cantidad");
+                if (item.nombre != null && !item.nombre.equals("-") && item.cantidad > 0) {
+                    lista.add(item);
+                }
                 i = cierre + 1;
             }
         } catch (Exception e) {
@@ -462,7 +545,9 @@ public class PedidosServer {
     private String extraerValor(String json, String clave) {
         String patron = "\"" + clave + "\":\"";
         int i = json.indexOf(patron);
-        if (i == -1) return "-";
+        if (i == -1) {
+            return "-";
+        }
         i += patron.length();
         int f = json.indexOf("\"", i);
         return f == -1 ? "-" : json.substring(i, f);
@@ -472,12 +557,18 @@ public class PedidosServer {
         try {
             String patron = "\"" + clave + "\":";
             int i = json.indexOf(patron);
-            if (i == -1) return 0;
+            if (i == -1) {
+                return 0;
+            }
             i += patron.length();
             int f = json.indexOf(",", i);
-            if (f == -1) f = json.indexOf("}", i);
+            if (f == -1) {
+                f = json.indexOf("}", i);
+            }
             return Double.parseDouble(json.substring(i, f).trim());
-        } catch (Exception e) { return 0; }
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private String extraerCategoriasDeLosItems(String json) {
@@ -487,42 +578,70 @@ public class PedidosServer {
         while ((i = json.indexOf(patron, i)) != -1) {
             i += patron.length();
             int f = json.indexOf("\"", i);
-            if (f != -1) cats.append(json, i, f).append(" ");
+            if (f != -1) {
+                cats.append(json, i, f).append(" ");
+            }
         }
         return cats.toString().toLowerCase();
     }
 
     private String calcularFranjaActual(String detalle, String categorias) {
+        if (!webAbierta) {
+            return "FUERA HORARIO";
+        }
+
         java.time.LocalTime ahora = java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago"));
         int hora = ahora.getHour(), minuto = ahora.getMinute();
         String d = detalle != null ? detalle.toLowerCase() : "";
         String c = categorias != null ? categorias.toLowerCase() : "";
 
-        boolean esPanaderia  = c.contains("panaderia") || c.contains("panadería")
-                            || d.contains("panaderia") || d.contains("panadería")
-                            || d.contains("hallula")   || d.contains("marraqueta")
-                            || d.contains("dobladita") || d.contains("pan amasado")
-                            || d.contains("pan ");
+        boolean esPanaderia = c.contains("panaderia") || c.contains("panadería")
+                || d.contains("panaderia") || d.contains("panadería")
+                || d.contains("hallula") || d.contains("marraqueta")
+                || d.contains("dobladita") || d.contains("pan amasado")
+                || d.contains("pan ");
         boolean esAnticipado = c.contains("pasteler") || c.contains("reposteri")
-                            || d.contains("pasteler") || d.contains("reposteri");
+                || d.contains("pasteler") || d.contains("reposteri");
 
-        if (esPanaderia)       { if (hora < 12 || hora >= 18) return "FUERA HORARIO"; }
-        else if (esAnticipado) { if (hora < 12 || hora >= 22) return "FUERA HORARIO"; }
-        else                   { if (hora < 18 || hora >= 22) return "FUERA HORARIO"; }
+        if (esPanaderia) {
+            if (hora < 12 || hora >= 18) {
+                return "FUERA HORARIO";
+
+            }
+        } else if (esAnticipado) {
+            if (hora < 12 || hora >= 22) {
+                return "FUERA HORARIO";
+
+            }
+        } else {
+            if (hora < 18 || hora >= 22) {
+                return "FUERA HORARIO";
+
+            }
+        }
 
         int iH, iM, fH, fM;
-        if (minuto < 30) { iH = hora; iM = 0;  fH = hora;     fM = 30; }
-        else             { iH = hora; iM = 30; fH = hora + 1; fM = 0;  }
+        if (minuto < 30) {
+            iH = hora;
+            iM = 0;
+            fH = hora;
+            fM = 30;
+        } else {
+            iH = hora;
+            iM = 30;
+            fH = hora + 1;
+            fM = 0;
+        }
         return String.format("%02d:%02d - %02d:%02d", iH, iM, fH, fM);
     }
 
     private String escaparJson(String t) {
-        return t == null ? "" : t.replace("\\","\\\\").replace("\"","\\\"")
-                .replace("\n","\\n").replace("\r","\\r").replace("\t","\\t");
+        return t == null ? "" : t.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 
     private void agregarCorsHeaders(HttpExchange e) {
-        e.getResponseHeaders().set("Access-Control-Allow-Origin",  "*");
+        e.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
         e.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         e.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }
@@ -544,7 +663,9 @@ public class PedidosServer {
         return v == null ? "-" : v.replaceAll("[<>\"']", "").trim();
     }
 
-    public void iniciar() { servidor.start(); }
+    public void iniciar() {
+        servidor.start();
+    }
 
     public static void main(String[] args) throws IOException {
         new PedidosServer().iniciar();
