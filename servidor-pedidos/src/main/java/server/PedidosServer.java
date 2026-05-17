@@ -8,6 +8,7 @@ import dao.InventarioDAO;
 import dao.PedidosDAO;
 import dao.RecetaDAO;
 import dao.RecetaItem;
+import server.EstadoWeb;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -30,7 +31,6 @@ public class PedidosServer {
     private final AdminDAO adminDAO = new AdminDAO();
 
     private final Object pedidoLock = new Object();
-    public static volatile boolean webAbierta = false;
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT")) : 8888;
@@ -311,7 +311,7 @@ public class PedidosServer {
                 return;
             }
             if ("GET".equals(exchange.getRequestMethod())) {
-                enviarRespuesta(exchange, 200, "{\"abierta\":" + webAbierta + "}");
+                enviarRespuesta(exchange, 200, "{\"abierta\":" + EstadoWeb.abierta + "}");
                 return;
             }
             if ("POST".equals(exchange.getRequestMethod())) {
@@ -321,9 +321,9 @@ public class PedidosServer {
                 }
                 String body = readBody(exchange);
                 String valor = extraerValor(body, "abierta");
-                webAbierta = "true".equals(valor);
-                System.out.println("[ESTADO WEB] → " + (webAbierta ? "ABIERTA" : "CERRADA"));
-                enviarRespuesta(exchange, 200, "{\"ok\":true,\"abierta\":" + webAbierta + "}");
+                EstadoWeb.abierta = "true".equals(valor);
+                System.out.println("[ESTADO WEB] → " + (EstadoWeb.abierta ? "ABIERTA" : "CERRADA"));
+                enviarRespuesta(exchange, 200, "{\"ok\":true,\"abierta\":" + EstadoWeb.abierta + "}");
                 return;
             }
             exchange.sendResponseHeaders(405, -1);
@@ -586,7 +586,7 @@ public class PedidosServer {
     }
 
     private String calcularFranjaActual(String detalle, String categorias) {
-        if (!webAbierta) {
+        if (!EstadoWeb.abierta) {
             return "FUERA HORARIO";
         }
 
