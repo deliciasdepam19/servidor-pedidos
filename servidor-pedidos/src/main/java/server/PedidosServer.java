@@ -30,7 +30,7 @@ public class PedidosServer {
     private final AdminDAO adminDAO = new AdminDAO();
 
     private final Object pedidoLock = new Object();
-    public static volatile boolean webAbierta = true;
+    public static volatile boolean webAbierta = false;
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT")) : 8888;
