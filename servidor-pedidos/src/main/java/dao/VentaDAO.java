@@ -207,6 +207,26 @@ public class VentaDAO {
         return ventas;
     }
 
+    public boolean existeReporteHoy(String fecha) {
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM reportes WHERE fecha::date = ?")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() && rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error en existeReporteHoy: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        } finally {
+            cerrarConexion(conn);
+        }
+    }
+
     public boolean registrarVenta(
             Map<Integer, Integer> items,
             Map<Integer, String> categorias,
@@ -379,11 +399,14 @@ public class VentaDAO {
         try {
             conn = Conexion.conectar();
 
+            // ── Solo fechas SIN reporte ────────────────────────────────────────
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT MIN(fecha) FROM ventas WHERE fecha::date < ? AND tipo_pago != 'PENDIENTE'")) {
+                    "SELECT MIN(fecha) FROM ventas "
+                    + "WHERE fecha::date < ? "
+                    + "AND tipo_pago != 'PENDIENTE' "
+                    + "AND fecha::date NOT IN (SELECT fecha::date FROM reportes)")) {
 
                 ps.setDate(1, java.sql.Date.valueOf(hoy));
-
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next() && rs.getDate(1) != null) {
                         fechaVentas = rs.getDate(1).toLocalDate();
@@ -392,10 +415,11 @@ public class VentaDAO {
             }
 
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT MIN(fecha) FROM ventas_rapidas WHERE fecha::date < ?")) {
+                    "SELECT MIN(fecha) FROM ventas_rapidas "
+                    + "WHERE fecha::date < ? "
+                    + "AND fecha::date NOT IN (SELECT fecha::date FROM reportes)")) {
 
                 ps.setDate(1, java.sql.Date.valueOf(hoy));
-
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next() && rs.getDate(1) != null) {
                         fechaRapidas = rs.getDate(1).toLocalDate();
@@ -415,7 +439,6 @@ public class VentaDAO {
         if (fechaRapidas == null) {
             return fechaVentas;
         }
-
         return fechaVentas.isBefore(fechaRapidas) ? fechaVentas : fechaRapidas;
     }
 
