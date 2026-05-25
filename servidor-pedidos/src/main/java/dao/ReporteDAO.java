@@ -15,7 +15,9 @@ public class ReporteDAO {
                 + "COALESCE(pedidos_local, 0) AS pedidos_local, "
                 + "COALESCE(generado_por, '') AS generado_por, "
                 + "COALESCE(detalle_categorias, '') AS detalle_categorias "
-                + "FROM reportes ORDER BY id DESC";
+                + "FROM reportes "
+                + "WHERE fecha >= CURRENT_DATE - INTERVAL '3 months' "
+                + "ORDER BY id DESC";
 
         Connection conn = null;
 
