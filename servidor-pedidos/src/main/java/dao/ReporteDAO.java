@@ -17,6 +17,7 @@ public class ReporteDAO {
                 + "COALESCE(detalle_categorias, '') AS detalle_categorias "
                 + "FROM reportes "
                 + "WHERE fecha::date >= CURRENT_DATE - INTERVAL '3 months' "
+                + "AND NOT (detalle = 'Cierre manual BD') "
                 + "ORDER BY id DESC";
 
         Connection conn = null;
