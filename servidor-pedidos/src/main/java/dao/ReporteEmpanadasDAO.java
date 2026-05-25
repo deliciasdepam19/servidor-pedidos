@@ -11,7 +11,7 @@ public class ReporteEmpanadasDAO {
 
         String sql = "SELECT fecha, total, total_efectivo, total_transferencia, detalle, detalle_categorias "
                 + "FROM reportes "
-                + "WHERE fecha >= CURRENT_DATE - INTERVAL '3 months' "
+                + "WHERE fecha::date >= CURRENT_DATE - INTERVAL '3 months' "
                 + "ORDER BY id DESC";
 
         Connection conn = null;
