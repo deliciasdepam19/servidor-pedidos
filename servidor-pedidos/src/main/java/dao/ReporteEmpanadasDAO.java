@@ -11,6 +11,7 @@ public class ReporteEmpanadasDAO {
 
         String sql = "SELECT fecha, total, total_efectivo, total_transferencia, detalle, detalle_categorias "
                 + "FROM reportes "
+                + "WHERE fecha >= CURRENT_DATE - INTERVAL '3 months' "
                 + "ORDER BY id DESC";
 
         Connection conn = null;
@@ -35,10 +36,8 @@ public class ReporteEmpanadasDAO {
                 String detalleEmp = filtrarDetalleEmpanadas(detalleCompleto);
                 String masVendida = extraerMasVendida(detalleEmp);
 
-                int cantRapidos = extraerCantCategoria(detalleCategorias, "RAPIDOS");
-                int totalUnidades = cantEmpanadas + cantRapidos;
-                double proporcion = totalUnidades > 0 ? (double) cantEmpanadas / totalUnidades : 1.0;
-                double totalEmp = Math.round(totalDia * proporcion);
+                double totalEmp = calcularTotalDesdeDetalle(detalleEmp, conn);
+                double proporcion = totalDia > 0 ? totalEmp / totalDia : 0.0;
                 double efecEmp = Math.round(totalEfec * proporcion);
                 double transfEmp = Math.round(totalTransf * proporcion);
 
@@ -118,5 +117,44 @@ public class ReporteEmpanadasDAO {
             }
         }
         return "—";
+    }
+
+    private double calcularTotalDesdeDetalle(String detalle, Connection conn) {
+        if (detalle == null || detalle.isBlank()) {
+            return 0;
+        }
+        double total = 0;
+        for (String item : detalle.split("\\|")) {
+            String t = item.trim();
+            if (t.isEmpty() || !t.contains(":")) {
+                continue;
+            }
+            String[] partes = t.split(":", 2);
+            String nombre = partes[0].trim();
+            int cantidad = 0;
+            try {
+                cantidad = Integer.parseInt(partes[1].trim().replaceAll("[^0-9]", ""));
+            } catch (Exception e) {
+                continue;
+            }
+
+            String nombreSinPrefijo = nombre.replaceAll("(?i)^empanada\\s*", "").trim();
+
+            try {
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT precio FROM empanadas WHERE LOWER(tipo) = LOWER(?) OR LOWER(tipo) = LOWER(?) LIMIT 1");
+                ps.setString(1, nombre);
+                ps.setString(2, nombreSinPrefijo);
+                ResultSet rs = ps.executeQuery();
+                if (rs.next()) {
+                    total += rs.getDouble("precio") * cantidad;
+                }
+                rs.close();
+                ps.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return total;
     }
 }
