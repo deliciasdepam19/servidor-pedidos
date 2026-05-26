@@ -680,7 +680,7 @@ public class PedidosServer {
         StringBuilder sb = new StringBuilder();
         for (ItemCarrito item : items) {
             if (sb.length() > 0) {
-                sb.append(" + ");
+                sb.append(" | ");
             }
             String prefijo = construirPrefijo(item.categoria, item.nombre);
 
