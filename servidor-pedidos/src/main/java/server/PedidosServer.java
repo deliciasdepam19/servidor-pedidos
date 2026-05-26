@@ -111,7 +111,11 @@ public class PedidosServer {
                     try {
                         String cliente = sanitizar(extraerValor(body, "cliente"));
                         String telefono = sanitizar(extraerValor(body, "telefono"));
-                        String detalle = sanitizar(extraerValor(body, "detalle"));
+                        String detalle = construirDetalleDesdeItems(body);
+                        if (detalle == null || detalle.isBlank()) {
+                            detalle = sanitizar(extraerValor(body, "detalle"));
+                        }
+
                         double total = extraerDouble(body, "total");
 
                         String tipoPago = extraerValor(body, "tipoPago");
@@ -665,6 +669,47 @@ public class PedidosServer {
 
     public void iniciar() {
         servidor.start();
+    }
+
+    private String construirDetalleDesdeItems(String json) {
+        List<ItemCarrito> items = extraerItems(json);
+        if (items.isEmpty()) {
+            return null;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (ItemCarrito item : items) {
+            if (sb.length() > 0) {
+                sb.append(" + ");
+            }
+            String prefijo = construirPrefijo(item.categoria, item.nombre);
+
+            String nombreCompleto = prefijo.isBlank()
+                    ? item.nombre
+                    : prefijo + " " + item.nombre;
+            sb.append(nombreCompleto).append(": ").append(item.cantidad).append(" uds.");
+        }
+        return sb.toString();
+    }
+
+    private String construirPrefijo(String categoria, String nombre) {
+        if (categoria == null || categoria.isBlank()) {
+            return "";
+        }
+
+        String cat = categoria.toLowerCase()
+                .replace("á", "a").replace("é", "e").replace("í", "i")
+                .replace("ó", "o").replace("ú", "u").replace("ñ", "n").trim();
+
+        String nombreLower = nombre != null ? nombre.toLowerCase() : "";
+
+        if (cat.contains("empanada")) {
+            return nombreLower.startsWith("empanada") ? "" : "Empanada";
+        }
+        if (cat.contains("sopaipilla")) {
+            return nombreLower.startsWith("sopaipilla") ? "" : "Sopaipilla";
+        }
+        return "";
     }
 
     public static void main(String[] args) throws IOException {
