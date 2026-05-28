@@ -587,7 +587,7 @@ public class VentaDAO {
         }
     }
 
-    // ── Firma actualizada: agrega parámetro gastos ────────────────────────────
+
     public int guardarReporteYReiniciar(
             double total,
             double totalEfectivo,
@@ -595,7 +595,7 @@ public class VentaDAO {
             Map<String, Integer> resumen,
             String usuario,
             String fecha,
-            double gastos) {   // ← nuevo parámetro
+            double gastos) {   
 
         Connection conn = null;
         try {
@@ -672,7 +672,7 @@ public class VentaDAO {
                 psReporte.setInt(8, pedidosWeb);
                 psReporte.setInt(9, pedidosLocal);
                 psReporte.setString(10, detalleCats.toString());
-                psReporte.setDouble(11, gastos);   // ← usa el parámetro
+                psReporte.setDouble(11, gastos);   
                 psReporte.executeUpdate();
             }
 
@@ -747,7 +747,7 @@ public class VentaDAO {
                 ps.setDouble(2, total);
                 ps.setString(3, metodoPago);
                 ps.setString(4, nombreCliente);
-                ps.setString(5, ui.MainFrame.USUARIO_ACTIVO);
+                ps.setString(5, "Sistema");
                 ps.executeUpdate();
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (!rs.next()) {
