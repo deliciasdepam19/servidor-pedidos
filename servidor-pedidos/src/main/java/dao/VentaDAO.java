@@ -1013,4 +1013,23 @@ public class VentaDAO {
             cerrarConexion(conn);
         }
     }
+
+      public boolean hayPedidosHoy(String fecha) {
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM pedidos WHERE fecha_hora::date = ?")) {
+                ps.setDate(1, java.sql.Date.valueOf(fecha));
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() && rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            cerrarConexion(conn);
+        }
+    }
 }
