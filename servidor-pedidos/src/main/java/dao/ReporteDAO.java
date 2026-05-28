@@ -14,7 +14,8 @@ public class ReporteDAO {
                 + "COALESCE(pedidos_web, 0) AS pedidos_web, "
                 + "COALESCE(pedidos_local, 0) AS pedidos_local, "
                 + "COALESCE(generado_por, '') AS generado_por, "
-                + "COALESCE(detalle_categorias, '') AS detalle_categorias "
+                + "COALESCE(detalle_categorias, '') AS detalle_categorias, "
+                + "COALESCE(gastos, 0) AS gastos "
                 + "FROM reportes "
                 + "WHERE fecha::date >= CURRENT_DATE - INTERVAL '3 months' "
                 + "AND NOT (detalle = 'Cierre manual BD') "
@@ -37,7 +38,8 @@ public class ReporteDAO {
                     String.valueOf(rs.getInt("pedidos_web")),
                     String.valueOf(rs.getInt("pedidos_local")),
                     rs.getString("generado_por"),
-                    rs.getString("detalle_categorias")
+                    rs.getString("detalle_categorias"),
+                    String.format("$%.0f", rs.getDouble("gastos"))
                 });
             }
             rs.close();
@@ -60,7 +62,8 @@ public class ReporteDAO {
                 + "COALESCE(pedidos_web, 0) AS pedidos_web, "
                 + "COALESCE(pedidos_local, 0) AS pedidos_local, "
                 + "COALESCE(generado_por, '') AS generado_por, "
-                + "COALESCE(detalle_categorias, '') AS detalle_categorias "
+                + "COALESCE(detalle_categorias, '') AS detalle_categorias, "
+                + "COALESCE(gastos, 0) AS gastos "
                 + "FROM reportes "
                 + "WHERE CAST(fecha AS TEXT) LIKE ? "
                 + "ORDER BY id DESC";
@@ -82,7 +85,8 @@ public class ReporteDAO {
                     String.valueOf(rs.getInt("pedidos_web")),
                     String.valueOf(rs.getInt("pedidos_local")),
                     rs.getString("generado_por"),
-                    rs.getString("detalle_categorias")
+                    rs.getString("detalle_categorias"),
+                    String.valueOf(rs.getDouble("gastos"))
                 });
             }
             rs.close();
