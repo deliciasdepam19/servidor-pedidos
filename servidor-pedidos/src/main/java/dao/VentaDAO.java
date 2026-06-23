@@ -776,7 +776,7 @@ public class VentaDAO {
                 ps.setDouble(2, total);
                 ps.setString(3, metodoPago);
                 ps.setString(4, nombreCliente);
-                ps.setString(5, ui.MainFrame.USUARIO_ACTIVO);
+                ps.setString(5, "servidor");
                 ps.executeUpdate();
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (!rs.next()) {
