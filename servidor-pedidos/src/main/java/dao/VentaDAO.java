@@ -486,7 +486,7 @@ public class VentaDAO {
                     "SELECT categorias_detalle FROM pedidos "
                     + "WHERE fecha_hora::date = ? AND origen = 'WEB' "
                     + "AND categorias_detalle IS NOT NULL "
-                    + "AND estado NOT IN ('CANCELADO', 'ELIMINADO')")) {
+                    + "AND estado NOT IN ('CANCELADO', 'ELIMINADO', 'COBRADO')")) {
                 ps.setDate(1, sqlFecha);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
