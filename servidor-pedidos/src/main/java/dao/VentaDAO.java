@@ -534,13 +534,31 @@ public class VentaDAO {
         try {
             conn = Conexion.conectar();
             java.sql.Date sqlFecha = java.sql.Date.valueOf(fecha);
+
+            int desdeVentas = 0;
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT COUNT(*) FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE' AND origen = 'WEB'")) {
                 ps.setDate(1, sqlFecha);
                 try (ResultSet rs = ps.executeQuery()) {
-                    return rs.next() ? rs.getInt(1) : 0;
+                    if (rs.next()) {
+                        desdeVentas = rs.getInt(1);
+                    }
                 }
             }
+
+            int desdePedidos = 0;
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM pedidos WHERE fecha_hora::date = ? AND origen = 'WEB' AND estado = 'COBRADO'")) {
+                ps.setDate(1, sqlFecha);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        desdePedidos = rs.getInt(1);
+                    }
+                }
+            }
+
+            return desdeVentas + desdePedidos;
+
         } catch (SQLException e) {
             e.printStackTrace();
             return 0;
@@ -577,7 +595,18 @@ public class VentaDAO {
                 }
             }
 
-            return desdeVentas + desdeRapidas;
+            int desdePedidos = 0;
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM pedidos WHERE fecha_hora::date = ? AND origen = 'LOCAL' AND estado = 'COBRADO'")) {
+                ps.setDate(1, sqlFecha);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        desdePedidos = rs.getInt(1);
+                    }
+                }
+            }
+
+            return desdeVentas + desdeRapidas + desdePedidos;
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -587,7 +616,7 @@ public class VentaDAO {
         }
     }
 
-
+    // ── Firma actualizada: agrega parámetro gastos ────────────────────────────
     public int guardarReporteYReiniciar(
             double total,
             double totalEfectivo,
@@ -595,7 +624,7 @@ public class VentaDAO {
             Map<String, Integer> resumen,
             String usuario,
             String fecha,
-            double gastos) {   
+            double gastos) {
 
         Connection conn = null;
         try {
@@ -672,7 +701,7 @@ public class VentaDAO {
                 psReporte.setInt(8, pedidosWeb);
                 psReporte.setInt(9, pedidosLocal);
                 psReporte.setString(10, detalleCats.toString());
-                psReporte.setDouble(11, gastos);   
+                psReporte.setDouble(11, gastos);   // ← usa el parámetro
                 psReporte.executeUpdate();
             }
 
@@ -747,7 +776,7 @@ public class VentaDAO {
                 ps.setDouble(2, total);
                 ps.setString(3, metodoPago);
                 ps.setString(4, nombreCliente);
-                ps.setString(5, "Sistema");
+                ps.setString(5, ui.MainFrame.USUARIO_ACTIVO);
                 ps.executeUpdate();
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (!rs.next()) {
@@ -1014,7 +1043,7 @@ public class VentaDAO {
         }
     }
 
-      public boolean hayPedidosHoy(String fecha) {
+    public boolean hayPedidosHoy(String fecha) {
         Connection conn = null;
         try {
             conn = Conexion.conectar();
