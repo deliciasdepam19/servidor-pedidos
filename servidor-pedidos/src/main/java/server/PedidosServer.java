@@ -1,4 +1,4 @@
-package server;
+﻿package server;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -37,8 +37,15 @@ public class PedidosServer {
 
     public static final String ADMIN_USER = System.getenv("ADMIN_USER") != null
             ? System.getenv("ADMIN_USER") : "admin";
-    public static final String ADMIN_PASS = System.getenv("ADMIN_PASS") != null
-            ? System.getenv("ADMIN_PASS") : "";
+    public static final String ADMIN_PASS = requireEnv("ADMIN_PASS");
+
+    private static String requireEnv(String key) {
+        String value = System.getenv(key);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Missing required env var: " + key);
+        }
+        return value;
+    }
 
     private HttpServer servidor;
 
@@ -62,7 +69,7 @@ public class PedidosServer {
 
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
-        // ── GET /api/pedidos/historico ────────────────────────────────────────
+        // â”€â”€ GET /api/pedidos/historico â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
@@ -92,7 +99,7 @@ public class PedidosServer {
             }
         });
 
-        // ── POST /api/pedidos ─────────────────────────────────────────────────
+        // â”€â”€ POST /api/pedidos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/pedidos", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -106,7 +113,7 @@ public class PedidosServer {
                     return;
                 }
                 String body = readBody(exchange);
-                System.out.println("[PEDIDOS] Body recibido: " + body);
+
                 synchronized (pedidoLock) {
                     try {
                         String cliente = sanitizar(extraerValor(body, "cliente"));
@@ -163,14 +170,14 @@ public class PedidosServer {
                                 + "\"numero\":" + numeroPedido + "}");
 
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        System.err.println("[PedidosServer] " + e.getMessage());
                         enviarRespuesta(exchange, 400, "{\"exito\":false}");
                     }
                 }
             }
         });
 
-        // ── GET /api/stock ────────────────────────────────────────────────────
+        // â”€â”€ GET /api/stock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/stock", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -181,13 +188,13 @@ public class PedidosServer {
                 try {
                     enviarRespuesta(exchange, 200, StockDescontador.obtenerStockJSON());
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.err.println("[PedidosServer] " + e.getMessage());
                     enviarRespuesta(exchange, 500, "{}");
                 }
             }
         });
 
-        // ── POST /api/usuarios ────────────────────────────────────────────────
+        // â”€â”€ POST /api/usuarios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/usuarios", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -199,16 +206,15 @@ public class PedidosServer {
                     String body = readBody(exchange);
                     String nombre = sanitizar(extraerValor(body, "nombre"));
                     String email = sanitizar(extraerValor(body, "email"));
-                    System.out.println("Usuario: " + nombre + " / " + email);
                     enviarRespuesta(exchange, 200, "{\"exito\":true}");
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.err.println("[PedidosServer] " + e.getMessage());
                     enviarRespuesta(exchange, 400, "{\"exito\":false}");
                 }
             }
         });
 
-        // ── GET /api/admin/stats ──────────────────────────────────────────────
+        // â”€â”€ GET /api/admin/stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/admin/stats", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -222,12 +228,12 @@ public class PedidosServer {
             try {
                 enviarRespuesta(exchange, 200, mapToJson(adminDAO.obtenerEstadisticas()));
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("[PedidosServer] " + e.getMessage());
                 enviarRespuesta(exchange, 500, "{}");
             }
         });
 
-        // ── GET /api/admin/logs ───────────────────────────────────────────────
+        // â”€â”€ GET /api/admin/logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/admin/logs", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -249,12 +255,12 @@ public class PedidosServer {
                 }
                 enviarRespuesta(exchange, 200, listOfMapsToJson(adminDAO.obtenerLogs(limite)));
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("[PedidosServer] " + e.getMessage());
                 enviarRespuesta(exchange, 500, "[]");
             }
         });
 
-        // ── GET + POST /api/admin/ips ─────────────────────────────────────────
+        // â”€â”€ GET + POST /api/admin/ips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/admin/ips", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -284,12 +290,12 @@ public class PedidosServer {
                     enviarRespuesta(exchange, 200, "{\"ok\":true}");
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("[PedidosServer] " + e.getMessage());
                 enviarRespuesta(exchange, 500, "{\"ok\":false}");
             }
         });
 
-        // ── GET /api/admin/usuarios ───────────────────────────────────────────
+        // â”€â”€ GET /api/admin/usuarios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/admin/usuarios", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -303,7 +309,7 @@ public class PedidosServer {
             try {
                 enviarRespuesta(exchange, 200, listOfMapsToJson(adminDAO.obtenerUsuarios(500)));
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("[PedidosServer] " + e.getMessage());
                 enviarRespuesta(exchange, 500, "[]");
             }
         });
@@ -326,7 +332,7 @@ public class PedidosServer {
                 String body = readBody(exchange);
                 String valor = extraerValor(body, "abierta");
                 EstadoWeb.abierta = "true".equals(valor);
-                System.out.println("[ESTADO WEB] → " + (EstadoWeb.abierta ? "ABIERTA" : "CERRADA"));
+                System.out.println("[ESTADO WEB] â†’ " + (EstadoWeb.abierta ? "ABIERTA" : "CERRADA"));
                 enviarRespuesta(exchange, 200, "{\"ok\":true,\"abierta\":" + EstadoWeb.abierta + "}");
                 return;
             }
@@ -390,7 +396,7 @@ public class PedidosServer {
         return sb.append("]").toString();
     }
 
-    // ── Throttling ────────────────────────────────────────────────────────────
+    // â”€â”€ Throttling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private String obtenerIp(HttpExchange exchange) {
         String forwarded = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
@@ -435,7 +441,7 @@ public class PedidosServer {
         return null;
     }
 
-    // ── Detección de duplicados ───────────────────────────────────────────────
+    // â”€â”€ DetecciÃ³n de duplicados â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private boolean esPedidoDuplicado(String cliente, String detalle) {
         String sql = "SELECT COUNT(*) FROM pedidos WHERE cliente=? AND detalle=? "
                 + "AND fecha_hora > NOW() - INTERVAL '15 seconds' AND origen='WEB'";
@@ -459,7 +465,7 @@ public class PedidosServer {
         }
     }
 
-    // ── Categorías e inventario ───────────────────────────────────────────────
+    // â”€â”€ CategorÃ­as e inventario â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private String construirCategoriasDetalle(String json) {
         List<ItemCarrito> items = extraerItems(json);
         Map<String, Integer> conteo = new LinkedHashMap<>();
@@ -501,8 +507,8 @@ public class PedidosServer {
         if (cat.endsWith("s") && !cat.equals("rapido")) {
             cat = cat.substring(0, cat.length() - 1);
         }
-        cat = cat.replace("á", "a").replace("é", "e").replace("í", "i")
-                .replace("ó", "o").replace("ú", "u").replace("ñ", "n");
+        cat = cat.replace("Ã¡", "a").replace("Ã©", "e").replace("Ã­", "i")
+                .replace("Ã³", "o").replace("Ãº", "u").replace("Ã±", "n");
         return cat.isEmpty() ? "rapido" : cat;
     }
 
@@ -541,7 +547,7 @@ public class PedidosServer {
         return lista;
     }
 
-    // ── Utilidades ────────────────────────────────────────────────────────────
+    // â”€â”€ Utilidades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private String readBody(HttpExchange exchange) throws IOException {
         return new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
     }
@@ -569,7 +575,7 @@ public class PedidosServer {
             if (f == -1) {
                 f = json.indexOf("}", i);
             }
-            return Double.parseDouble(json.substring(i, f).trim());
+            return Math.max(0, Double.parseDouble(json.substring(i, f).trim()));
         } catch (Exception e) {
             return 0;
         }
@@ -599,8 +605,8 @@ public class PedidosServer {
         String d = detalle != null ? detalle.toLowerCase() : "";
         String c = categorias != null ? categorias.toLowerCase() : "";
 
-        boolean esPanaderia = c.contains("panaderia") || c.contains("panadería")
-                || d.contains("panaderia") || d.contains("panadería")
+        boolean esPanaderia = c.contains("panaderia") || c.contains("panaderÃ­a")
+                || d.contains("panaderia") || d.contains("panaderÃ­a")
                 || d.contains("hallula") || d.contains("marraqueta")
                 || d.contains("dobladita") || d.contains("pan amasado")
                 || d.contains("pan ");
@@ -664,7 +670,9 @@ public class PedidosServer {
     }
 
     private String sanitizar(String v) {
-        return v == null ? "-" : v.replaceAll("[<>\"']", "").trim();
+        if (v == null) return "-";
+        if (v.length() > 500) v = v.substring(0, 500);
+        return v.replaceAll("[<>\"']", "").trim();
     }
 
     public void iniciar() {
@@ -698,8 +706,8 @@ public class PedidosServer {
         }
 
         String cat = categoria.toLowerCase()
-                .replace("á", "a").replace("é", "e").replace("í", "i")
-                .replace("ó", "o").replace("ú", "u").replace("ñ", "n").trim();
+                .replace("Ã¡", "a").replace("Ã©", "e").replace("Ã­", "i")
+                .replace("Ã³", "o").replace("Ãº", "u").replace("Ã±", "n").trim();
 
         String nombreLower = nombre != null ? nombre.toLowerCase() : "";
 
@@ -716,3 +724,4 @@ public class PedidosServer {
         new PedidosServer().iniciar();
     }
 }
+
