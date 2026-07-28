@@ -41,6 +41,27 @@ public class PedidosServer {
     private final Map<String, Integer> contadorPorIp     = new ConcurrentHashMap<>();
     private final Map<String, Long>    bloqueadoHasta    = new ConcurrentHashMap<>();
 
+    // ── Auth ───────────────────────────────────────────────────────────────────
+    private static final String ADMIN_USER = System.getenv("ADMIN_USER") != null
+            ? System.getenv("ADMIN_USER") : "admin";
+    private static final String ADMIN_PASS = requireEnv("ADMIN_PASS");
+
+    private static String requireEnv(String key) {
+        String value = System.getenv(key);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Missing required env var: " + key);
+        }
+        return value;
+    }
+
+    private boolean isAuthorized(HttpExchange exchange) {
+        String auth = exchange.getRequestHeaders().getFirst("Authorization");
+        if (auth == null || !auth.startsWith("Basic ")) return false;
+        String expected = "Basic " + java.util.Base64.getEncoder()
+                .encodeToString((ADMIN_USER + ":" + ADMIN_PASS).getBytes(StandardCharsets.UTF_8));
+        return expected.equals(auth);
+    }
+
     private static class ItemCarrito {
         String nombre;
         String categoria;
@@ -70,7 +91,6 @@ public class PedidosServer {
                 // ─────────────────────────────────────────────────────────
 
                 String body = readBody(exchange);
-                System.out.println("[PEDIDOS] Body recibido: " + body);
 
                 synchronized (pedidoLock) {
                     try {
@@ -91,10 +111,8 @@ public class PedidosServer {
                         }
 
                         String categorias = extraerCategoriasDeLosItems(body);
-                        System.out.println("CATEGORIAS DETECTADAS: " + categorias);
 
                         String franja = calcularFranjaActual(detalle, categorias);
-                        System.out.println("FRANJA CALCULADA: " + franja);
 
                         if ("FUERA HORARIO".equals(franja)) {
                             enviarRespuesta(exchange, 403,
@@ -106,13 +124,10 @@ public class PedidosServer {
                         if ("-".equals(fechaEntrega) || fechaEntrega.isBlank()) fechaEntrega = null;
 
                         String categoriasDetalle = construirCategoriasDetalle(body);
-                        System.out.println("[PEDIDOS] categoriasDetalle: " + categoriasDetalle);
 
                         int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
                                 cliente, telefono, detalle, total, franja, "WEB",
                                 fechaEntrega, categoriasDetalle);
-
-                        System.out.println("[PEDIDOS] Resultado: id=" + resultado[0] + " num=" + resultado[1]);
 
                         int id           = resultado[0];
                         int numeroPedido = resultado[1];
@@ -125,7 +140,7 @@ public class PedidosServer {
                                 + "\"numero\":" + numeroPedido + "}");
 
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        System.err.println("[PedidosServer] " + e.getMessage());
                         enviarRespuesta(exchange, 400, "{\"exito\":false}");
                     }
                 }
@@ -135,6 +150,10 @@ public class PedidosServer {
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
+                if (!isAuthorized(exchange)) {
+                    enviarRespuesta(exchange, 401, "{\"error\":\"Unauthorized\"}");
+                    return;
+                }
                 List<PedidosDAO.PedidoBD> pedidos = pedidosDAO.cargarPedidosDeHoy();
                 StringBuilder json = new StringBuilder("[");
                 for (int i = 0; i < pedidos.size(); i++) {
@@ -169,7 +188,7 @@ public class PedidosServer {
                 try {
                     enviarRespuesta(exchange, 200, StockDescontador.obtenerStockJSON());
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.err.println("[PedidosServer] " + e.getMessage());
                     enviarRespuesta(exchange, 500, "{}");
                 }
             }
@@ -186,16 +205,11 @@ public class PedidosServer {
                     String body   = readBody(exchange);
                     String nombre = sanitizar(extraerValor(body, "nombre"));
                     String email  = sanitizar(extraerValor(body, "email"));
-                    System.out.println("Usuario: " + nombre + " / " + email);
                     enviarRespuesta(exchange, 200, "{\"exito\":true}");
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.err.println("[PedidosServer] " + e.getMessage());
                     enviarRespuesta(exchange, 400, "{\"exito\":false}");
-                }
-            }
-        });
-
-        servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
+                }(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
     }
 
@@ -387,7 +401,7 @@ public class PedidosServer {
             i += patron.length();
             int f = json.indexOf(",", i);
             if (f == -1) f = json.indexOf("}", i);
-            return Double.parseDouble(json.substring(i, f).trim());
+            return Math.max(0, Double.parseDouble(json.substring(i, f).trim()));
         } catch (Exception e) {
             return 0;
         }
@@ -462,7 +476,9 @@ public class PedidosServer {
     }
 
     private String sanitizar(String v) {
-        return v == null ? "-" : v.replaceAll("[<>\"']", "").trim();
+        if (v == null) return "-";
+        if (v.length() > 500) v = v.substring(0, 500);
+        return v.replaceAll("[<>\"']", "").trim();
     }
 
     public void iniciar() { servidor.start(); }

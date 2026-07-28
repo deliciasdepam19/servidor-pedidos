@@ -51,12 +51,9 @@ public class Conexion {
             sharedConn = crearConexion();
 
             System.out.println("Conexión PostgreSQL inicializada");
-            System.out.println("URL: " + URL);
-            System.out.println("Usuario: " + POSTGRES_USER);
 
         } catch (Exception e) {
-            System.err.println("Error inicializando conexión: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("[Conexion] " + e.getMessage());
         }
     }
 

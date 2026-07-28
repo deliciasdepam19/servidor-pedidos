@@ -106,16 +106,14 @@ public class PedidosDAO {
             return new int[]{id, numero};
 
         } catch (SQLException e) {
-            System.out.println("❌ [PEDIDO] Error SQL: " + e.getMessage());
-            System.out.println("❌ [PEDIDO] SQLState: " + e.getSQLState());
-            System.out.println("❌ [PEDIDO] ErrorCode: " + e.getErrorCode());
+            System.err.println("[PedidosDAO] " + e.getMessage());
             try {
                 if (conn != null) {
                     conn.rollback();
                 }
             } catch (SQLException ignored) {
             }
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -147,7 +145,7 @@ public class PedidosDAO {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -167,7 +165,7 @@ public class PedidosDAO {
                 return ps.executeUpdate() > 0;
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -188,7 +186,7 @@ public class PedidosDAO {
                 return ps.executeUpdate() > 0;
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -207,7 +205,7 @@ public class PedidosDAO {
                 return ps.executeUpdate() > 0;
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -239,7 +237,7 @@ public class PedidosDAO {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -259,7 +257,7 @@ public class PedidosDAO {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -278,7 +276,7 @@ public class PedidosDAO {
                 return ps.executeUpdate() > 0;
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -301,7 +299,7 @@ public class PedidosDAO {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -329,7 +327,7 @@ public class PedidosDAO {
                 ps.executeUpdate();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -347,8 +345,7 @@ public class PedidosDAO {
             ps.executeUpdate();
             ps.close();
         } catch (Exception e) {
-            System.out.println("Error al marcar pedido como PROCESADO: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -369,9 +366,7 @@ public class PedidosDAO {
                     + "AND estado NOT IN ('COBRADO', 'CANCELADO', 'ELIMINADO') "
                     + "ORDER BY fecha_hora ASC");
             ResultSet rs = ps.executeQuery();
-            System.out.println("[DAO] Ejecutando query pedidos pendientes hoy...");
             while (rs.next()) {
-                System.out.println("[DAO] Encontrado id=" + rs.getInt("id"));
                 PedidoBD p = new PedidoBD(
                         rs.getInt("id"), rs.getInt("numero"),
                         rs.getString("cliente"), rs.getString("telefono"),
@@ -384,8 +379,7 @@ public class PedidosDAO {
             rs.close();
             ps.close();
         } catch (Exception e) {
-            System.out.println("Error cargando pedidos pendientes: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
@@ -420,7 +414,7 @@ public class PedidosDAO {
             rs.close();
             ps.close();
         } catch (Exception e) {
-            System.out.println("Error: " + e.getMessage());
+            System.err.println("[PedidosDAO] " + e.getMessage());
         } finally {
             if (conn != null) {
                 Conexion.devolver(conn);
