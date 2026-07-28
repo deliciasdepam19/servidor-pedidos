@@ -14,8 +14,12 @@ public class ReporteDAO {
                 + "COALESCE(pedidos_web, 0) AS pedidos_web, "
                 + "COALESCE(pedidos_local, 0) AS pedidos_local, "
                 + "COALESCE(generado_por, '') AS generado_por, "
-                + "COALESCE(detalle_categorias, '') AS detalle_categorias "
-                + "FROM reportes ORDER BY id DESC";
+                + "COALESCE(detalle_categorias, '') AS detalle_categorias, "
+                + "COALESCE(gastos, 0) AS gastos "
+                + "FROM reportes "
+                + "WHERE fecha::date >= CURRENT_DATE - INTERVAL '3 months' "
+                + "AND NOT (detalle = 'Cierre manual BD') "
+                + "ORDER BY id DESC";
 
         Connection conn = null;
 
@@ -34,7 +38,55 @@ public class ReporteDAO {
                     String.valueOf(rs.getInt("pedidos_web")),
                     String.valueOf(rs.getInt("pedidos_local")),
                     rs.getString("generado_por"),
-                    rs.getString("detalle_categorias")
+                    rs.getString("detalle_categorias"),
+                    String.format("$%.0f", rs.getDouble("gastos"))
+                });
+            }
+            rs.close();
+            stmt.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                Conexion.devolver(conn);
+            }
+        }
+        return lista;
+    }
+
+    public List<String[]> buscarPorFecha(String termino) {
+        List<String[]> lista = new ArrayList<>();
+
+        String sql = "SELECT fecha, total, total_efectivo, total_transferencia, detalle, "
+                + "COALESCE(total_pendiente, 0) AS total_pendiente, "
+                + "COALESCE(pedidos_web, 0) AS pedidos_web, "
+                + "COALESCE(pedidos_local, 0) AS pedidos_local, "
+                + "COALESCE(generado_por, '') AS generado_por, "
+                + "COALESCE(detalle_categorias, '') AS detalle_categorias, "
+                + "COALESCE(gastos, 0) AS gastos "
+                + "FROM reportes "
+                + "WHERE CAST(fecha AS TEXT) LIKE ? "
+                + "ORDER BY id DESC";
+
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, "%" + termino + "%");
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                lista.add(new String[]{
+                    rs.getDate("fecha").toLocalDate().toString(),
+                    String.format("$%.0f", rs.getDouble("total")),
+                    String.format("$%.0f", rs.getDouble("total_efectivo")),
+                    String.format("$%.0f", rs.getDouble("total_transferencia")),
+                    rs.getString("detalle"),
+                    String.format("$%.0f", rs.getDouble("total_pendiente")),
+                    String.valueOf(rs.getInt("pedidos_web")),
+                    String.valueOf(rs.getInt("pedidos_local")),
+                    rs.getString("generado_por"),
+                    rs.getString("detalle_categorias"),
+                    String.valueOf(rs.getDouble("gastos"))
                 });
             }
             rs.close();

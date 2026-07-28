@@ -25,9 +25,7 @@ public class PendientesDAO {
             e.printStackTrace();
             return false;
         } finally {
-            if (conn != null) {
-                Conexion.devolver(conn);
-            }
+            if (conn != null) Conexion.devolver(conn);
         }
     }
 
@@ -54,29 +52,22 @@ public class PendientesDAO {
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
-            if (conn != null) {
-                Conexion.devolver(conn);
-            }
+            if (conn != null) Conexion.devolver(conn);
         }
         return lista;
     }
 
     public static boolean liquidar(int id, String tipoPago) {
-        String sqlGet = "SELECT nombre_cliente, total, fecha_venta, detalle FROM ventas_pendientes WHERE id = ?";
-        String sqlUpdatePendiente = "UPDATE ventas_pendientes SET estado = 'PAGADO', fecha_pago = ?, "
-                + "tipo_pago_liquidacion = ? WHERE id = ?";
+        String sqlGet = "SELECT nombre_cliente, total, fecha_venta, detalle "
+                + "FROM ventas_pendientes WHERE id = ?";
+        String sqlUpdatePendiente = "UPDATE ventas_pendientes SET estado = 'PAGADO', "
+                + "fecha_pago = ?, tipo_pago_liquidacion = ? WHERE id = ?";
         String sqlUpdateVenta = "UPDATE ventas SET tipo_pago = ? "
                 + "WHERE id = ("
                 + "  SELECT id FROM ventas "
                 + "  WHERE nombre_cliente = ? AND tipo_pago = 'PENDIENTE' "
                 + "  ORDER BY id DESC LIMIT 1"
                 + ")";
-        String sqlActualizarReporte = "UPDATE reportes SET "
-                + "total_pendiente = CASE WHEN total_pendiente - ? < 0 THEN 0 ELSE total_pendiente - ? END, "
-                + "total_efectivo = total_efectivo + CASE WHEN ? = 'EFECTIVO' THEN ? ELSE 0 END, "
-                + "total_transferencia = total_transferencia + CASE WHEN ? = 'TRANSFERENCIA' THEN ? ELSE 0 END, "
-                + "total = total + ? "
-                + "WHERE fecha::date = ?";
 
         Connection conn = null;
         try {
@@ -109,32 +100,45 @@ public class PendientesDAO {
             try (PreparedStatement ps = conn.prepareStatement(sqlUpdateVenta)) {
                 ps.setString(1, tipoPago);
                 ps.setString(2, nombreCliente);
-                ps.executeUpdate();
+                int filasVenta = ps.executeUpdate();
+                System.out.println("=== UPDATE ventas: filas=" + filasVenta
+                        + " (0 es normal si el cierre ya eliminó la venta)");
             }
 
-            // Verificar si existe reporte para esa fecha
             try (PreparedStatement psCheck = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM reportes WHERE fecha::date = ?")) {
+                    "SELECT id, total_pendiente FROM reportes WHERE fecha::date = ?")) {
                 psCheck.setDate(1, java.sql.Date.valueOf(fechaVenta));
                 ResultSet rsCheck = psCheck.executeQuery();
-                boolean existeReporte = rsCheck.next() && rsCheck.getInt(1) > 0;
-                System.out.println("=== Reporte existe: " + existeReporte);
 
-                if (existeReporte) {
-                    try (PreparedStatement ps = conn.prepareStatement(sqlActualizarReporte)) {
-                        ps.setDouble(1, total);
-                        ps.setDouble(2, total);
-                        ps.setString(3, tipoPago);
-                        ps.setDouble(4, total);
-                        ps.setString(5, tipoPago);
-                        ps.setDouble(6, total);
-                        ps.setDouble(7, total);
-                        ps.setDate(8, java.sql.Date.valueOf(fechaVenta));
-                        int filas = ps.executeUpdate();
-                        System.out.println("=== UPDATE REPORTE: filas afectadas = " + filas);
+                if (rsCheck.next()) {
+                    int reporteId = rsCheck.getInt("id");
+                    double pendienteActual = rsCheck.getDouble("total_pendiente");
+                    System.out.println("=== Reporte encontrado id=" + reporteId
+                            + " total_pendiente=" + pendienteActual);
+
+                    String sqlActualizar = "EFECTIVO".equals(tipoPago)
+                            ? "UPDATE reportes SET "
+                            + "total_pendiente = GREATEST(0, total_pendiente - ?), "
+                            + "total_efectivo = total_efectivo + ?, "
+                            + "total = total + ? "
+                            + "WHERE id = ?"
+                            : "UPDATE reportes SET "
+                            + "total_pendiente = GREATEST(0, total_pendiente - ?), "
+                            + "total_transferencia = total_transferencia + ?, "
+                            + "total = total + ? "
+                            + "WHERE id = ?";
+
+                    try (PreparedStatement psUp = conn.prepareStatement(sqlActualizar)) {
+                        psUp.setDouble(1, total);
+                        psUp.setDouble(2, total);
+                        psUp.setDouble(3, total);
+                        psUp.setInt(4, reporteId);
+                        int filas = psUp.executeUpdate();
+                        System.out.println("=== UPDATE reporte: filas=" + filas);
                     }
                 } else {
-                    System.out.println("=== Sin reporte aún, se incluirá al cerrar el día");
+                    System.out.println("=== Sin reporte para fecha=" + fechaVenta
+                            + ", se incluirá al cerrar el día");
                 }
             }
 
@@ -144,17 +148,12 @@ public class PendientesDAO {
 
         } catch (SQLException e) {
             try {
-                if (conn != null) {
-                    conn.rollback();
-                }
-            } catch (SQLException ignored) {
-            }
+                if (conn != null) conn.rollback();
+            } catch (SQLException ignored) {}
             e.printStackTrace();
             return false;
         } finally {
-            if (conn != null) {
-                Conexion.devolver(conn);
-            }
+            if (conn != null) Conexion.devolver(conn);
         }
     }
 
@@ -172,9 +171,7 @@ public class PendientesDAO {
             e.printStackTrace();
             return false;
         } finally {
-            if (conn != null) {
-                Conexion.devolver(conn);
-            }
+            if (conn != null) Conexion.devolver(conn);
         }
     }
 
@@ -185,17 +182,13 @@ public class PendientesDAO {
             conn = Conexion.conectar();
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery(sql);
-            if (rs.next()) {
-                return rs.getDouble(1);
-            }
+            if (rs.next()) return rs.getDouble(1);
             rs.close();
             stmt.close();
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
-            if (conn != null) {
-                Conexion.devolver(conn);
-            }
+            if (conn != null) Conexion.devolver(conn);
         }
         return 0;
     }
@@ -209,17 +202,13 @@ public class PendientesDAO {
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setString(1, fecha);
             ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                return rs.getDouble(1);
-            }
+            if (rs.next()) return rs.getDouble(1);
             rs.close();
             ps.close();
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
-            if (conn != null) {
-                Conexion.devolver(conn);
-            }
+            if (conn != null) Conexion.devolver(conn);
         }
         return 0;
     }
