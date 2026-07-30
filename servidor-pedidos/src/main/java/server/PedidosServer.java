@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 import dao.AdminDAO;
 import dao.InventarioDAO;
 import dao.PedidosDAO;
+import dao.ProductoDAO;
 import dao.RecetaDAO;
 import dao.RecetaItem;
 import server.EstadoWeb;
