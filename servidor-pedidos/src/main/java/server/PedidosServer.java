@@ -61,6 +61,7 @@ public class PedidosServer {
             ? System.getenv("API_KEY") : "delicias-kds-2026";
 
     private static final Pattern PATRON_DETALLE = Pattern.compile("(\\d+)?\\s*(.+)");
+    private static final Pattern PATRON_DETALLE_NUEVO = Pattern.compile("(.+):\\s*(\\d+)\\s*uds\\.?");
 
     private static String cocinaHtmlCache = null;
     private static long cocinaHtmlTimestamp = 0;
@@ -828,17 +829,37 @@ public class PedidosServer {
     static List<ItemPedido> parsearDetalle(String detalle, Map<String, String> catMap) {
         List<ItemPedido> items = new ArrayList<>();
         if (detalle == null || detalle.isBlank()) return items;
-        String[] segmentos = detalle.split(",");
+
+        // Detectar separador: pipe (nuevo formato web) o coma (formato viejo POS)
+        String[] segmentos;
+        if (detalle.contains(" | ")) {
+            segmentos = detalle.split(" \\| ");
+        } else {
+            segmentos = detalle.split(",");
+        }
+
         for (String seg : segmentos) {
             seg = seg.trim();
             if (seg.isEmpty()) continue;
-            Matcher m = PATRON_DETALLE.matcher(seg);
-            if (!m.matches()) continue;
+
             int cantidad = 1;
-            if (m.group(1) != null) {
-                try { cantidad = Integer.parseInt(m.group(1)); } catch (NumberFormatException ignored) {}
+            String texto;
+
+            // Intentar formato nuevo: "producto: X uds."
+            Matcher mNuevo = PATRON_DETALLE_NUEVO.matcher(seg);
+            if (mNuevo.matches()) {
+                texto = mNuevo.group(1).trim();
+                try { cantidad = Integer.parseInt(mNuevo.group(2)); } catch (NumberFormatException e) {}
+            } else {
+                // Intentar formato viejo: "X producto"
+                Matcher m = PATRON_DETALLE.matcher(seg);
+                if (!m.matches()) continue;
+                if (m.group(1) != null) {
+                    try { cantidad = Integer.parseInt(m.group(1)); } catch (NumberFormatException ignored) {}
+                }
+                texto = m.group(2).trim();
             }
-            String texto = m.group(2).trim();
+
             if (texto.isEmpty()) continue;
             String cat = resolverCategoria(texto, catMap);
             items.add(new ItemPedido(texto, cantidad, cat));

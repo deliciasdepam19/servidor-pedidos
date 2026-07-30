@@ -194,7 +194,11 @@ function renderizar(d){
     var ih = '';
     for(var j = 0; j < p.items.length; j++){
       var it = p.items[j];
-      var nom = (it.producto || '').replace(/^\d+\s*(docenas?\s*)?/i, '');
+      var nom = (it.producto || '')
+        .replace(/^\d+\s*(docenas?\s*)?/i, '')
+        .replace(/\s*:\s*\d+\s*uds\.?$/i, '')
+        .replace(/\s*uds\.?$/i, '')
+        .trim();
       if(nom.length > 80) nom = nom.substring(0, 80) + '...';
       ih += '<div class="card-detalle">' + eh(it.cantidad) + ' ' + eh(nom) + '</div>';
     }
