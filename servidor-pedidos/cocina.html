@@ -57,11 +57,13 @@ body{
   color:#c0d6d8;
 }
 .sidebar-cat .count{font-size:24px;font-weight:800;color:#40cee0;min-width:36px;text-align:right;}
+.sidebar-total{margin-top:8px;border-top:2px solid rgba(255,180,100,0.3);color:#ffb464;font-weight:700;}
+.sidebar-total .count{color:#ffb464;}
 
 /* GRID */
 #pedidos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
 #sin-conexion{display:none;background:rgba(255,136,136,0.12);color:#ff8888;padding:10px 20px;border-radius:10px;margin-bottom:16px;font-size:14px;text-align:center;border:1px solid rgba(255,136,136,0.2);}
-#empty-state{display:none;text-align:center;padding:100px 20px;color:#6a8f96;font-size:26px;font-family:'Inter',sans-serif;}
+#empty-state{display:none;justify-content:center;align-items:center;min-height:60vh;color:#6a8f96;font-size:26px;font-family:'Inter',sans-serif;}
 
 /* PEDIDO CARD */
 .pedido-card{
@@ -163,7 +165,7 @@ function renderizar(d){
   var emptyEl = document.getElementById('empty-state');
 
   if(pedidos.length === 0){
-    emptyEl.style.display = 'block'; grid.innerHTML = '';
+    emptyEl.style.display = 'flex'; grid.innerHTML = '';
     actualizarBadges([], []); renderSidebar([]);
     return;
   }
@@ -240,11 +242,17 @@ function renderSidebar(pedidos){
   h += s('Hallulla Grande', cats.hallullaGrande);
   h += s('Dobladitas', cats.dobladitas);
   h += s('Integrales', cats.integrales);
+  var total = cats.amasados + cats.colizas + cats.hallullas + cats.hallullaGrande + cats.dobladitas + cats.integrales;
+  h += sTotal('Total', total);
   sb.innerHTML = h;
 }
 
 function s(nombre, cant){
   return '<div class="sidebar-cat"><span>' + eh(nombre) + '</span><span class="count">' + cant + '</span></div>';
+}
+
+function sTotal(nombre, cant){
+  return '<div class="sidebar-cat sidebar-total"><span>' + eh(nombre) + '</span><span class="count">' + cant + '</span></div>';
 }
 
 function eh(s){
