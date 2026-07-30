@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="refresh" content="3600">
+<title>Cocina - Delicias de Pam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:'Inter',sans-serif;background:#09100f;color:#e0eff1;
+  min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;
+}
+
+/* TOP BAR */
+#topbar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 24px;border-bottom:1px solid rgba(64,206,224,0.12);
+  background:rgba(9,16,15,0.95);position:sticky;top:0;z-index:10;
+}
+.badge-top{
+  display:inline-block;padding:10px 24px;border-radius:10px;
+  font-family:'Inter',sans-serif;font-size:20px;font-weight:700;
+}
+.badge-top-web{background:rgba(64,206,224,0.12);color:#40cee0;border:1px solid rgba(64,206,224,0.2);}
+.badge-top-APP{background:rgba(130,224,170,0.1);color:#82e0aa;border:1px solid rgba(130,224,170,0.2);}
+.badge-top-total{background:rgba(255,180,100,0.12);color:#ffb464;border:1px solid rgba(255,180,100,0.2);}
+#brand{
+  font-family:'Playfair Display',serif;font-size:32px;font-weight:700;
+  color:#e0eff1;text-align:center;flex:1;
+}
+#reloj{
+  font-family:'Inter',sans-serif;font-size:36px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:#40cee0;
+}
+
+/* MAIN LAYOUT */
+#cuerpo{display:flex;min-height:calc(100vh - 68px);}
+#pedidos-area{flex:1;padding:24px;}
+#sidebar{
+  width:260px;background:#101a1c;padding:24px 16px;
+  border-left:1px solid rgba(64,206,224,0.1);overflow-y:auto;
+}
+
+/* SIDEBAR */
+#sidebar h3{
+  font-family:'Inter',sans-serif;font-size:12px;text-transform:uppercase;
+  color:#6a8f96;margin-bottom:16px;letter-spacing:2px;
+}
+.sidebar-cat{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 14px;margin-bottom:6px;border-radius:10px;
+  font-family:'Inter',sans-serif;font-size:17px;font-weight:600;
+  background:rgba(64,206,224,0.04);border:1px solid rgba(64,206,224,0.08);
+  color:#c0d6d8;
+}
+.sidebar-cat .count{font-size:24px;font-weight:800;color:#40cee0;min-width:36px;text-align:right;}
+
+/* GRID */
+#pedidos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+#sin-conexion{display:none;background:rgba(255,136,136,0.12);color:#ff8888;padding:10px 20px;border-radius:10px;margin-bottom:16px;font-size:14px;text-align:center;border:1px solid rgba(255,136,136,0.2);}
+#empty-state{display:none;text-align:center;padding:100px 20px;color:#6a8f96;font-size:26px;font-family:'Inter',sans-serif;}
+
+/* PEDIDO CARD */
+.pedido-card{
+  background:#101a1c;border-radius:16px;padding:20px;
+  border:1px solid rgba(64,206,224,0.12);
+  border-left:4px solid #40cee0;
+  transition:opacity 0.5s ease;
+}
+.pedido-card.estado-proceso{border-left-color:#ff8800;}
+.pedido-card.removing{opacity:0;}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.pedido-numero{
+  font-family:'Inter',sans-serif;font-size:34px;font-weight:800;
+  color:#e0eff1;letter-spacing:-0.5px;
+}
+.origen-badge{
+  display:inline-block;padding:5px 14px;border-radius:20px;
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:600;
+}
+.origen-web{background:rgba(64,206,224,0.12);color:#40cee0;border:1px solid rgba(64,206,224,0.2);}
+.origen-app{background:rgba(130,224,170,0.1);color:#82e0aa;border:1px solid rgba(130,224,170,0.2);}
+.card-cliente{
+  font-family:'Playfair Display',serif;font-size:17px;font-weight:600;
+  color:#40cee0;margin-bottom:4px;
+}
+.card-hora{font-size:13px;color:#6a8f96;margin-bottom:10px;}
+.card-detalle{font-size:19px;color:#e0eff1;line-height:1.7;font-weight:500;}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  #cuerpo{flex-direction:column-reverse;}
+  #sidebar{width:100%;border-left:none;border-top:1px solid rgba(64,206,224,0.1);padding:16px;}
+  #pedidos-grid{grid-template-columns:1fr;}
+  #reloj{font-size:28px;}
+  .badge-top{font-size:16px;padding:8px 16px;}
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div style="display:flex;gap:12px;align-items:center;flex:1;">
+    <span class="badge-top badge-top-web" id="badge-web">WEB 0</span>
+    <span class="badge-top badge-top-APP" id="badge-APP">APP 0</span>
+    <span id="brand">Delicias de Pam</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <span class="badge-top badge-top-total" id="badge-total">TOTAL 0</span>
+    <div id="reloj">--:--</div>
+  </div>
+</div>
+
+<div id="cuerpo">
+  <div id="pedidos-area">
+    <div id="sin-conexion">Sin conexión</div>
+    <div id="empty-state">Sin pedidos activos</div>
+    <div id="pedidos-grid"></div>
+  </div>
+  <aside id="sidebar">
+    <h3>Productos</h3>
+    <div id="sidebar-content"></div>
+  </aside>
+</div>
+
+<script>
+const API_KEY = '__API_KEY__';
+const POLL_MS = 5000;
+const MOCK = false;
+var ultimosDatos = null;
+
+function actualizarReloj(){
+  var a = new Date();
+  document.getElementById('reloj').textContent =
+    a.getHours().toString().padStart(2,'0') + ':' + a.getMinutes().toString().padStart(2,'0');
+}
+actualizarReloj();
+setInterval(actualizarReloj, 30000);
+
+async function cargarPedidos(){
+  if(MOCK){
+    renderizar(mockData());
+    return;
+  }
+  try{
+    var r = await fetch('/api/cocina/pedidos', { headers: { 'X-API-Key': API_KEY } });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    ultimosDatos = d;
+    document.getElementById('sin-conexion').style.display = 'none';
+    renderizar(d);
+  } catch(e) {
+    document.getElementById('sin-conexion').style.display = 'block';
+  }
+}
+
+function renderizar(d){
+  var pedidos = d.pedidos || [];
+  var grid = document.getElementById('pedidos-grid');
+  var emptyEl = document.getElementById('empty-state');
+
+  if(pedidos.length === 0){
+    emptyEl.style.display = 'block'; grid.innerHTML = '';
+    actualizarBadges([], []); renderSidebar([]);
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  var idsActuales = new Set();
+  grid.querySelectorAll('.pedido-card').forEach(function(c){ idsActuales.add(c.dataset.pedidoId); });
+  var idsNuevos = new Set(pedidos.map(function(p){ return p.numero; }));
+  idsActuales.forEach(function(id){
+    if(!idsNuevos.has(id)){
+      var card = grid.querySelector('[data-pedido-id="' + id + '"]');
+      if(card) card.classList.add('removing');
+    }
+  });
+
+  actualizarBadges(pedidos, d.totales || {});
+  renderSidebar(pedidos);
+
+  var html = '';
+  for(var i = 0; i < pedidos.length; i++){
+    var p = pedidos[i];
+    var ec = p.estado === 'EN PROCESO' ? 'estado-proceso' : '';
+    var esApp = p.origen === 'LOCAL' || p.origen === 'APP';
+    var oc = esApp ? 'origen-app' : 'origen-web';
+    var oi = esApp ? 'APP' : 'WEB';
+    var ih = '';
+    for(var j = 0; j < p.items.length; j++){
+      var it = p.items[j];
+      var nom = (it.producto || '').replace(/^\d+\s*(docenas?\s*)?/i, '');
+      if(nom.length > 80) nom = nom.substring(0, 80) + '...';
+      ih += '<div class="card-detalle">' + eh(it.cantidad) + ' ' + eh(nom) + '</div>';
+    }
+    html += '<div class="pedido-card ' + ec + '" data-pedido-id="' + eh(p.numero) + '">';
+    html += '<div class="card-top"><span class="pedido-numero">' + eh(p.numero) + '</span>';
+    html += '<span class="origen-badge ' + oc + '">' + oi + '</span></div>';
+    html += '<div class="card-cliente">' + eh(p.cliente) + '</div>';
+    html += '<div class="card-hora">' + eh(p.hora) + '</div>';
+    html += ih + '</div>';
+  }
+  grid.innerHTML = html;
+  setTimeout(function(){ grid.querySelectorAll('.removing').forEach(function(c){ c.remove(); }); }, 500);
+}
+
+function actualizarBadges(pedidos, totales){
+  var w = 0, l = 0;
+  for(var i = 0; i < pedidos.length; i++){
+    if(pedidos[i].origen === 'LOCAL' || pedidos[i].origen === 'APP') l++; else w++;
+  }
+  document.getElementById('badge-web').textContent = 'WEB ' + w;
+  document.getElementById('badge-APP').textContent = 'APP ' + l;
+  document.getElementById('badge-total').textContent = 'TOTAL PEDIDOS ' + pedidos.length;
+}
+
+function renderSidebar(pedidos){
+  var sb = document.getElementById('sidebar-content');
+  var cats = { amasados:0, colizas:0, hallullas:0, dobladitas:0, integrales:0, hallullaGrande:0, otros:0 };
+  for(var i = 0; i < pedidos.length; i++){
+    var items = pedidos[i].items || [];
+    for(var j = 0; j < items.length; j++){
+      var nom = (items[j].producto || '').toLowerCase();
+      if(nom.indexOf('integral') >= 0) cats.integrales += items[j].cantidad;
+      else if(nom.indexOf('amasado') >= 0) cats.amasados += items[j].cantidad;
+      else if(nom.indexOf('coliza') >= 0) cats.colizas += items[j].cantidad;
+      else if(nom.indexOf('hallulla grande') >= 0 || nom.indexOf('hallulla grande') >= 0) cats.hallullaGrande += items[j].cantidad;
+      else if(nom.indexOf('hallulla') >= 0) cats.hallullas += items[j].cantidad;
+      else if(nom.indexOf('dobladita') >= 0) cats.dobladitas += items[j].cantidad;
+      else cats.otros += items[j].cantidad;
+    }
+  }
+  var h = '';
+  h += s('Amasados', cats.amasados);
+  h += s('Colizas', cats.colizas);
+  h += s('Hallullas', cats.hallullas);
+  h += s('Hallulla Grande', cats.hallullaGrande);
+  h += s('Dobladitas', cats.dobladitas);
+  h += s('Integrales', cats.integrales);
+  sb.innerHTML = h;
+}
+
+function s(nombre, cant){
+  return '<div class="sidebar-cat"><span>' + eh(nombre) + '</span><span class="count">' + cant + '</span></div>';
+}
+
+function eh(s){
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function mockData(){
+  return {
+    pedidos: [
+      { numero:'#W042', cliente:'María García', telefono:'+56912345678', hora:'19:15', origen:'WEB', estado:'PENDIENTE', items:[
+        {producto:'3 docenas empanadas de carne', cantidad:3, categoria:'Empanada'},
+        {producto:'2 churros normales', cantidad:2, categoria:'Churro'}
+      ]},
+      { numero:'#L018', cliente:'Pedro Soto', telefono:'+56987654321', hora:'19:22', origen:'APP', estado:'PENDIENTE', items:[
+        {producto:'5 amasados', cantidad:5, categoria:'Panadería'},
+        {producto:'3 hallullas', cantidad:3, categoria:'Panadería'},
+        {producto:'2 colizas', cantidad:2, categoria:'Panadería'}
+      ]},
+      { numero:'#W043', cliente:'Ana López', telefono:'+56911223344', hora:'19:28', origen:'WEB', estado:'PENDIENTE', items:[
+        {producto:'4 dobladitas', cantidad:4, categoria:'Panadería'},
+        {producto:'2 hallulla grande', cantidad:2, categoria:'Panadería'},
+        {producto:'3 integrales', cantidad:3, categoria:'Panadería'}
+      ]},
+      { numero:'#L019', cliente:'Carlos Muñoz', telefono:'+56955443322', hora:'19:31', origen:'APP', estado:'PENDIENTE', items:[
+        {producto:'6 amasados', cantidad:6, categoria:'Panadería'},
+        {producto:'1 sopaipilla', cantidad:1, categoria:'Sopaipilla'}
+      ]},
+      { numero:'#W044', cliente:'Josefa Rojas', telefono:'+56966778899', hora:'19:35', origen:'WEB', estado:'PENDIENTE', items:[
+        {producto:'2 hallulla grande', cantidad:2, categoria:'Panadería'},
+        {producto:'4 dobladitas', cantidad:4, categoria:'Panadería'},
+        {producto:'1 docena empanadas pino', cantidad:1, categoria:'Empanada'}
+      ]}
+    ],
+    totales: {}
+  };
+}
+
+cargarPedidos();
+setInterval(cargarPedidos, POLL_MS);
+</script>
+</body>
+</html>

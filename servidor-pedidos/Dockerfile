@@ -7,5 +7,6 @@ RUN mvn package -q
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /app/target/servidor-pedidos-1.0.jar app.jar
+COPY cocina.html .
 EXPOSE 8888
 CMD ["java", "-jar", "app.jar"]

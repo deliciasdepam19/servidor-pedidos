@@ -13,15 +13,21 @@ import server.EstadoWeb;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Exchanger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import model.Producto;
 
 public class PedidosServer {
 
@@ -49,6 +55,16 @@ public class PedidosServer {
 
     private HttpServer servidor;
 
+    // ── Kitchen Display ──────────────────────────────────────────────────
+    private static final String API_KEY = System.getenv("API_KEY") != null
+            ? System.getenv("API_KEY") : "delicias-kds-2026";
+
+    private static final Pattern PATRON_DETALLE = Pattern.compile("(\\d+)?\\s*(.+)");
+
+    private static String cocinaHtmlCache = null;
+    private static long cocinaHtmlTimestamp = 0;
+
+    // ── Rate limiting ────────────────────────────────────────────────────
     private static final long VENTANA_MS = 10_000L;
     private static final int MAX_PEDIDOS_HORA = 5;
     private static final long HORA_MS = 60 * 60 * 1000L;
@@ -63,6 +79,13 @@ public class PedidosServer {
         String nombre;
         String categoria;
         int cantidad;
+    }
+
+    static class ItemPedido {
+        String producto;
+        int cantidad;
+        String categoria;
+        ItemPedido(String p, int c, String cat) { this.producto = p; this.cantidad = c; this.categoria = cat; }
     }
 
     public PedidosServer() throws IOException {
@@ -337,6 +360,105 @@ public class PedidosServer {
                 return;
             }
             exchange.sendResponseHeaders(405, -1);
+        });
+
+        // ── Kitchen Display: API JSON ────────────────────────────────────────
+        servidor.createContext("/api/cocina/pedidos", exchange -> {
+
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if ("GET".equals(exchange.getRequestMethod())) {
+                String key = exchange.getRequestHeaders().getFirst("X-API-Key");
+                if (key == null || !key.equals(API_KEY)) {
+                    enviarRespuesta(exchange, 401, "{\"error\":\"No autorizado\"}");
+                    return;
+                }
+
+                try {
+                    List<PedidosDAO.PedidoBD> pedidos = pedidosDAO.cargarPedidosPendientesDeHoy();
+                    Map<String, String> catMap = cargarMapaProductos();
+
+                    List<PedidosDAO.PedidoBD> activos = new ArrayList<>();
+                    for (PedidosDAO.PedidoBD p : pedidos) {
+                        if ("PENDIENTE".equals(p.estado)) {
+                            activos.add(p);
+                        }
+                    }
+
+                    StringBuilder json = new StringBuilder("{\"pedidos\":[");
+                    Map<String, Map<String, Integer>> totalesGeneral = new LinkedHashMap<>();
+
+                    for (int i = 0; i < activos.size(); i++) {
+                        PedidosDAO.PedidoBD p = activos.get(i);
+                        String origen = p.origen != null ? p.origen : "WEB";
+                        List<ItemPedido> items = parsearDetalle(p.detalle, catMap);
+                        Map<String, Map<String, Integer>> totalesOrigen = agruparTotales(items, origen);
+                        for (Map.Entry<String, Map<String, Integer>> e : totalesOrigen.entrySet()) {
+                            totalesGeneral.putIfAbsent(e.getKey(), new LinkedHashMap<>());
+                            for (Map.Entry<String, Integer> ce : e.getValue().entrySet()) {
+                                totalesGeneral.get(e.getKey()).merge(ce.getKey(), ce.getValue(), Integer::sum);
+                            }
+                        }
+                        json.append("{\"numero\":\"").append(PedidosDAO.formatearNumero(p.numero, origen))
+                            .append("\",\"cliente\":\"").append(escaparJson(p.cliente))
+                            .append("\",\"telefono\":\"").append(escaparJson(p.telefono))
+                            .append("\",\"hora\":\"").append(obtenerHora(p.timestamp))
+                            .append("\",\"origen\":\"").append(origen)
+                            .append("\",\"estado\":\"").append(p.estado)
+                            .append("\",\"items\":[");
+                        for (int j = 0; j < items.size(); j++) {
+                            ItemPedido it = items.get(j);
+                            json.append("{\"producto\":\"").append(escaparJson(it.producto))
+                                .append("\",\"cantidad\":").append(it.cantidad)
+                                .append(",\"categoria\":\"").append(escaparJson(it.categoria)).append("\"}");
+                            if (j < items.size() - 1) json.append(",");
+                        }
+                        json.append("]}");
+                        if (i < activos.size() - 1) json.append(",");
+                    }
+
+                    json.append("],\"totales\":{");
+                    int oi = 0;
+                    for (Map.Entry<String, Map<String, Integer>> e : totalesGeneral.entrySet()) {
+                        json.append("\"").append(e.getKey()).append("\":{");
+                        int ci = 0;
+                        for (Map.Entry<String, Integer> ce : e.getValue().entrySet()) {
+                            json.append("\"").append(escaparJson(ce.getKey())).append("\":").append(ce.getValue());
+                            if (ci++ < e.getValue().size() - 1) json.append(",");
+                        }
+                        json.append("}");
+                        if (oi++ < totalesGeneral.size() - 1) json.append(",");
+                    }
+                    json.append("}}");
+
+                    byte[] bb = json.toString().getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                    exchange.sendResponseHeaders(200, bb.length);
+                    exchange.getResponseBody().write(bb);
+                    exchange.close();
+
+                } catch (Exception e) {
+                    System.err.println("[KDS] Error API: " + e.getMessage());
+                    enviarRespuesta(exchange, 500, "{\"error\":\"Error al consultar pedidos\"}");
+                }
+            }
+        });
+
+        // ── Kitchen Display: HTML ────────────────────────────────────────────
+        servidor.createContext("/cocina", exchange -> {
+            if ("GET".equals(exchange.getRequestMethod())) {
+                String html = cargarCocinaHtml();
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                byte[] b = html.getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, b.length);
+                exchange.getResponseBody().write(b);
+                exchange.close();
+            }
         });
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
@@ -673,6 +795,83 @@ public class PedidosServer {
         if (v == null) return "-";
         if (v.length() > 500) v = v.substring(0, 500);
         return v.replaceAll("[<>\"']", "").trim();
+    }
+
+    // ── Kitchen Display: helpers ────────────────────────────────────────────
+
+    private String cargarCocinaHtml() {
+        File f = new File("cocina.html");
+        if (cocinaHtmlCache == null || f.lastModified() > cocinaHtmlTimestamp) {
+            try {
+                cocinaHtmlCache = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+                cocinaHtmlTimestamp = f.lastModified();
+                System.out.println("[KDS] cocina.html cargado (" + cocinaHtmlCache.length() + " bytes)");
+            } catch (IOException e) {
+                System.err.println("[KDS] No se pudo leer cocina.html: " + e.getMessage());
+                return "<html><body><h1>Error</h1><p>No se pudo cargar cocina.html</p></body></html>";
+            }
+        }
+        return cocinaHtmlCache.replace("__API_KEY__", API_KEY);
+    }
+
+    private Map<String, String> cargarMapaProductos() {
+        ProductoDAO dao = new ProductoDAO();
+        List<Producto> productos = dao.listarTodosConStock();
+        Map<String, String> mapa = new HashMap<>();
+        for (Producto p : productos) {
+            mapa.put(p.getNombre().toLowerCase(), p.getCategoria());
+        }
+        return mapa;
+    }
+
+    static List<ItemPedido> parsearDetalle(String detalle, Map<String, String> catMap) {
+        List<ItemPedido> items = new ArrayList<>();
+        if (detalle == null || detalle.isBlank()) return items;
+        String[] segmentos = detalle.split(",");
+        for (String seg : segmentos) {
+            seg = seg.trim();
+            if (seg.isEmpty()) continue;
+            Matcher m = PATRON_DETALLE.matcher(seg);
+            if (!m.matches()) continue;
+            int cantidad = 1;
+            if (m.group(1) != null) {
+                try { cantidad = Integer.parseInt(m.group(1)); } catch (NumberFormatException ignored) {}
+            }
+            String texto = m.group(2).trim();
+            if (texto.isEmpty()) continue;
+            String cat = resolverCategoria(texto, catMap);
+            items.add(new ItemPedido(texto, cantidad, cat));
+        }
+        return items;
+    }
+
+    static Map<String, Map<String, Integer>> agruparTotales(List<ItemPedido> items, String origen) {
+        Map<String, Map<String, Integer>> r = new LinkedHashMap<>();
+        Map<String, Integer> cats = new LinkedHashMap<>();
+        for (ItemPedido it : items) cats.merge(it.categoria, it.cantidad, Integer::sum);
+        r.put(origen, cats);
+        return r;
+    }
+
+    private static String resolverCategoria(String texto, Map<String, String> catMap) {
+        if (texto == null || texto.isBlank()) return "Otros";
+        String t = texto.toLowerCase()
+            .replaceAll("\\b(de|del|la|las|los|lo|con|y|e|un|una|unas|unos|docenas?|unidades?|docena|unidad)\\b", " ")
+            .replaceAll("\\s+", " ").trim();
+        t = t.replaceAll("(?<=\\w)s\\b", "");
+        String mejor = null; int mejorLen = 0;
+        for (Map.Entry<String, String> e : catMap.entrySet()) {
+            String pn = e.getKey().toLowerCase().replaceAll("\\s+", " ").trim().replaceAll("(?<=\\w)s\\b", "");
+            if (t.contains(pn) || pn.contains(t)) {
+                if (pn.length() > mejorLen) { mejorLen = pn.length(); mejor = e.getValue(); }
+            }
+        }
+        return mejor != null ? mejor : "Otros";
+    }
+
+    private static String obtenerHora(String ts) {
+        if (ts == null || ts.length() < 16) return "--:--";
+        try { return ts.substring(11, 16); } catch (Exception e) { return "--:--"; }
     }
 
     public void iniciar() {
