@@ -156,6 +156,7 @@ async function cargarPedidos(){
     renderizar(d);
   } catch(e) {
     document.getElementById('sin-conexion').style.display = 'block';
+    renderSidebar([]);
   }
 }
 
@@ -297,6 +298,9 @@ function mockData(){
 
 cargarPedidos();
 setInterval(cargarPedidos, POLL_MS);
+
+// Mostrar sidebar con ceros desde el inicio, sin esperar la API
+renderSidebar([]);
 </script>
 </body>
 </html>
