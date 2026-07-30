@@ -296,6 +296,47 @@ function mockData(){
   };
 }
 
+// ── Sonido de notificación (timbre tipo doorbell) ──────────────────────
+var audioCtx = null;
+function tocarTimbre() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var ahora = audioCtx.currentTime;
+    // Dos tonos: ding-dong
+    [0, 0.18].forEach(function(offset, i) {
+      var freq = i === 0 ? 800 : 640;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.3, ahora + offset);
+      gain.gain.exponentialRampToValueAtTime(0.01, ahora + offset + 0.25);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(ahora + offset);
+      osc.stop(ahora + offset + 0.3);
+    });
+  } catch(e) {}
+}
+
+// Detectar nuevos pedidos comparando con el estado anterior
+var ultimoSnapshot = '';
+function hayPedidosNuevos(d) {
+  var ids = (d.pedidos || []).map(function(p){ return p.numero; }).sort().join(',');
+  var esNuevo = ultimoSnapshot && ids !== ultimoSnapshot && (d.pedidos || []).length > 0;
+  ultimoSnapshot = ids;
+  return esNuevo;
+}
+
+// ── Wrapper de cargarPedidos con sonido ────────────────────────────────
+var cargarPedidosOriginal = cargarPedidos;
+cargarPedidos = async function() {
+  await cargarPedidosOriginal();
+  if (ultimosDatos && hayPedidosNuevos(ultimosDatos)) {
+    tocarTimbre();
+  }
+};
+
 cargarPedidos();
 setInterval(cargarPedidos, POLL_MS);
 
