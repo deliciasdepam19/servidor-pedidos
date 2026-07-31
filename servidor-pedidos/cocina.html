@@ -97,6 +97,7 @@
     #brand {
       height: 50px;
       width: auto;
+      border: 1px solid red;
     }
 
     #reloj {
@@ -247,6 +248,7 @@
 
     #brand {
       height: 50px;
+      /* ajusta el tamaño */
       width: auto;
     }
 
@@ -321,7 +323,7 @@
     </div>
 
     <div class="topbar-center">
-     <img id="brand" src="./src/main/java/img/delicias.png">
+      <img id="brand" src="/img/delicias.png">
     </div>
 
     <div class="topbar-right">
@@ -433,8 +435,8 @@
       for (var i = 0; i < pedidos.length; i++) {
         if (pedidos[i].origen === 'LOCAL' || pedidos[i].origen === 'APP') l++; else w++;
       }
-      document.getElementById('badge-web').textContent = 'WEB ' + w;
-      document.getElementById('badge-APP').textContent = 'APP ' + l;
+      document.getElementById('badge-web').textContent = 'WEB (' + w + ')';
+      document.getElementById('badge-APP').textContent = 'APP (' + l + ')';
       document.getElementById('badge-total').textContent = 'TOTAL PEDIDOS ' + pedidos.length;
     }
 
