@@ -94,7 +94,6 @@ public class PedidosServer {
 
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
-        // â”€â”€ GET /api/pedidos/historico â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
@@ -124,7 +123,6 @@ public class PedidosServer {
             }
         });
 
-        // â”€â”€ POST /api/pedidos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/pedidos", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -202,7 +200,6 @@ public class PedidosServer {
             }
         });
 
-        // â”€â”€ GET /api/stock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/stock", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -219,7 +216,6 @@ public class PedidosServer {
             }
         });
 
-        // â”€â”€ POST /api/usuarios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/usuarios", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -239,7 +235,6 @@ public class PedidosServer {
             }
         });
 
-        // â”€â”€ GET /api/admin/stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/admin/stats", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -258,7 +253,6 @@ public class PedidosServer {
             }
         });
 
-        // â”€â”€ GET /api/admin/logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/admin/logs", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -285,7 +279,6 @@ public class PedidosServer {
             }
         });
 
-        // â”€â”€ GET + POST /api/admin/ips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/admin/ips", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -320,7 +313,6 @@ public class PedidosServer {
             }
         });
 
-        // â”€â”€ GET /api/admin/usuarios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         servidor.createContext("/api/admin/usuarios", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {
@@ -364,7 +356,6 @@ public class PedidosServer {
             exchange.sendResponseHeaders(405, -1);
         });
 
-        // ── Kitchen Display: API JSON ────────────────────────────────────────
         servidor.createContext("/api/cocina/pedidos", exchange -> {
 
             agregarCorsHeaders(exchange);
@@ -451,7 +442,6 @@ public class PedidosServer {
             }
         });
 
-        // ── Kitchen Display: HTML ────────────────────────────────────────────
         servidor.createContext("/cocina", exchange -> {
             if ("GET".equals(exchange.getRequestMethod())) {
                 String html = cargarCocinaHtml();
@@ -462,6 +452,39 @@ public class PedidosServer {
                 exchange.close();
             }
         });
+
+servidor.createContext("/img/", exchange -> {
+    if (!"GET".equals(exchange.getRequestMethod())) {
+        exchange.sendResponseHeaders(405, -1);
+        return;
+    }
+    String path = exchange.getRequestURI().getPath(); 
+    String filename = path.substring("/img/".length());
+
+    if (filename.contains("..") || filename.isBlank()) {
+        exchange.sendResponseHeaders(400, -1);
+        return;
+    }
+
+    try (InputStream is = PedidosServer.class.getResourceAsStream("/static/img/" + filename)) {
+        if (is == null) {
+            exchange.sendResponseHeaders(404, -1);
+            return;
+        }
+        byte[] bytes = is.readAllBytes();
+
+        String contentType = filename.endsWith(".png") ? "image/png"
+                : (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) ? "image/jpeg"
+                : "application/octet-stream";
+
+        exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=86400");
+        exchange.sendResponseHeaders(200, bytes.length);
+        exchange.getResponseBody().write(bytes);
+    } finally {
+        exchange.close();
+    }
+});
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
