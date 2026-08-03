@@ -591,7 +591,7 @@ servidor.createContext("/img/", exchange -> {
     // â”€â”€ DetecciÃ³n de duplicados â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private boolean esPedidoDuplicado(String cliente, String detalle) {
         String sql = "SELECT COUNT(*) FROM pedidos WHERE cliente=? AND detalle=? "
-                + "AND fecha_hora > NOW() - INTERVAL '15 seconds' AND origen='WEB'";
+                + "AND fecha_hora::timestamptz > NOW() - INTERVAL '15 seconds' AND origen='WEB'";
         Connection conn = null;
         try {
             conn = dao.Conexion.conectar();
