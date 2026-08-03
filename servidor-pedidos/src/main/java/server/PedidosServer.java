@@ -176,8 +176,17 @@ public class PedidosServer {
 
                         String categoriasDetalle = construirCategoriasDetalle(body);
 
+                        String origen = extraerValor(body, "origen");
+                        if (!"WEB".equalsIgnoreCase(origen)
+                                && !"LOCAL".equalsIgnoreCase(origen)
+                                && !"APP".equalsIgnoreCase(origen)) {
+                            origen = "WEB";
+                        } else {
+                            origen = origen.toUpperCase();
+                        }
+
                         int[] resultado = pedidosDAO.guardarPedidoAutoNumero(
-                                cliente, telefono, detalle, total, franja, "WEB",
+                                cliente, telefono, detalle, total, franja, origen,
                                 fechaEntrega, categoriasDetalle);
 
                         int id = resultado[0];

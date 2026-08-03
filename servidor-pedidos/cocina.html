@@ -84,10 +84,16 @@
       border: 1px solid rgba(64, 206, 224, 0.2);
     }
 
-    .badge-top-APP {
+    .badge-top-local {
       background: rgba(130, 224, 170, 0.1);
       color: #82e0aa;
       border: 1px solid rgba(130, 224, 170, 0.2);
+    }
+
+    .badge-top-app {
+      background: rgba(180, 130, 255, 0.12);
+      color: #c7a6ff;
+      border: 1px solid rgba(180, 130, 255, 0.25);
     }
 
     .badge-top-total {
@@ -270,6 +276,12 @@
       border: 1px solid rgba(130, 224, 170, 0.2);
     }
 
+    .origen-local {
+      background: rgba(130, 224, 170, 0.1);
+      color: #82e0aa;
+      border: 1px solid rgba(130, 224, 170, 0.2);
+    }
+
     .card-cliente {
       font-family: 'Playfair Display', serif;
       font-size: 15px;
@@ -325,7 +337,8 @@
   <div id="topbar">
     <div class="topbar-left">
       <span class="badge-top badge-top-web" id="badge-web">WEB (0)</span>
-      <span class="badge-top badge-top-APP" id="badge-APP">APP (0)</span>
+      <span class="badge-top badge-top-local" id="badge-local">LOCAL (0)</span>
+      <span class="badge-top badge-top-app" id="badge-app">APP (0)</span>
     </div>
 
 <div class="topbar-center">
@@ -415,9 +428,10 @@
       for (var i = 0; i < pedidos.length; i++) {
         var p = pedidos[i];
         var ec = p.estado === 'EN PROCESO' ? 'estado-proceso' : '';
-        var esApp = p.origen === 'LOCAL' || p.origen === 'APP';
-        var oc = esApp ? 'origen-app' : 'origen-web';
-        var oi = esApp ? 'APP' : 'WEB';
+        var esLocal = p.origen === 'LOCAL';
+        var esApp = p.origen === 'APP';
+        var oc = esLocal ? 'origen-local' : (esApp ? 'origen-app' : 'origen-web');
+        var oi = esLocal ? 'LOCAL' : (esApp ? 'APP' : 'WEB');
         var ih = '';
         for (var j = 0; j < p.items.length; j++) {
           var it = p.items[j];
@@ -441,12 +455,15 @@
     }
 
     function actualizarBadges(pedidos, totales) {
-      var w = 0, l = 0;
-      for (var i = 0; i < pedidos.length; i++) {
-        if (pedidos[i].origen === 'LOCAL' || pedidos[i].origen === 'APP') l++; else w++;
-      }
-      document.getElementById('badge-web').textContent = 'WEB (' + w + ')';
-      document.getElementById('badge-APP').textContent = 'APP (' + l + ')';
+        var w = 0, l = 0, a = 0;
+        for (var i = 0; i < pedidos.length; i++) {
+          if (pedidos[i].origen === 'LOCAL') l++;
+          else if (pedidos[i].origen === 'APP') a++;
+          else w++;
+        }
+        document.getElementById('badge-web').textContent = 'WEB (' + w + ')';
+        document.getElementById('badge-local').textContent = 'LOCAL (' + l + ')';
+        document.getElementById('badge-app').textContent = 'APP (' + a + ')';
       document.getElementById('badge-total').textContent = 'TOTAL PEDIDOS ' + pedidos.length;
     }
 
