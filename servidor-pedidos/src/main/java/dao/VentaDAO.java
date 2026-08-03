@@ -765,18 +765,38 @@ public class VentaDAO {
             conn = Conexion.conectar();
             conn.setAutoCommit(false);
 
+            double total = carrito.entrySet().stream()
+                    .mapToDouble(e -> precios.getOrDefault(e.getKey(), 0.0) * e.getValue())
+                    .sum();
+
+            for (Map.Entry<String, Integer> en : carrito.entrySet()) {
+                String key = en.getKey();
+                int productoId = ids.getOrDefault(key, 0);
+                if (productoId <= 0) {
+                    continue;
+                }
+
+                String tabla = ProductoDAO.tablaDesdeCategoria(categorias.get(key));
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT stock FROM " + tabla + " WHERE id = ?")) {
+                    ps.setInt(1, productoId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next() || rs.getInt("stock") < en.getValue()) {
+                            conn.rollback();
+                            return false;
+                        }
+                    }
+                }
+            }
+
             int ventaId;
-            String sqlVenta = "INSERT INTO ventas (fecha, total, metodo_pago, cliente, usuario) "
-                    + "VALUES (?, ?, ?, ?, ?)";
+            String sqlVenta = "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) "
+                    + "VALUES (?, ?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sqlVenta, Statement.RETURN_GENERATED_KEYS)) {
-                double total = carrito.entrySet().stream()
-                        .mapToDouble(e -> precios.getOrDefault(e.getKey(), 0.0) * e.getValue())
-                        .sum();
                 ps.setString(1, java.time.LocalDate.now().toString());
                 ps.setDouble(2, total);
                 ps.setString(3, metodoPago);
                 ps.setString(4, nombreCliente);
-                ps.setString(5, "servidor");
                 ps.executeUpdate();
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (!rs.next()) {
@@ -786,8 +806,9 @@ public class VentaDAO {
                 }
             }
 
-            String sqlDetalle = "INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario) "
-                    + "VALUES (?, ?, ?, ?)";
+            String sqlDetalle = "INSERT INTO detalle_ventas "
+                    + "(venta_id, producto_tipo, producto_id, nombre, cantidad, subtotal) "
+                    + "VALUES (?, ?, ?, ?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sqlDetalle)) {
                 for (Map.Entry<String, Integer> en : carrito.entrySet()) {
                     String key = en.getKey();
@@ -796,31 +817,52 @@ public class VentaDAO {
                         continue;
                     }
                     ps.setInt(1, ventaId);
-                    ps.setInt(2, productoId);
-                    ps.setInt(3, en.getValue());
-                    ps.setDouble(4, precios.getOrDefault(key, 0.0));
+                    ps.setString(2, categorias.getOrDefault(key, "").toLowerCase());
+                    ps.setInt(3, productoId);
+                    ps.setString(4, nombres.getOrDefault(key, ""));
+                    ps.setInt(5, en.getValue());
+                    ps.setDouble(6, precios.getOrDefault(key, 0.0) * en.getValue());
                     ps.addBatch();
                 }
                 ps.executeBatch();
             }
 
-            String sqlStock = "UPDATE productos SET stock = stock - ? WHERE id = ? AND stock >= ?";
-            try (PreparedStatement ps = conn.prepareStatement(sqlStock)) {
+            String sqlRapido = "INSERT INTO ventas_rapidas "
+                    + "(fecha, nombre, cantidad, precio_unitario, subtotal, tipo_pago, grupo_venta_id) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sqlRapido)) {
                 for (Map.Entry<String, Integer> en : carrito.entrySet()) {
                     String key = en.getKey();
-                    int productoId = ids.getOrDefault(key, -1);
-                    if (productoId <= 0) {
+                    if (ids.getOrDefault(key, 0) > 0) {
                         continue;
                     }
-                    int cant = en.getValue();
-                    ps.setInt(1, cant);
-                    ps.setInt(2, productoId);
-                    ps.setInt(3, cant);
+                    double precio = precios.getOrDefault(key, 0.0);
+                    ps.setDate(1, java.sql.Date.valueOf(java.time.LocalDate.now()));
+                    ps.setString(2, nombres.getOrDefault(key, ""));
+                    ps.setInt(3, en.getValue());
+                    ps.setDouble(4, precio);
+                    ps.setDouble(5, precio * en.getValue());
+                    ps.setString(6, metodoPago);
+                    ps.setInt(7, ventaId);
                     ps.addBatch();
                 }
-                int[] resultados = ps.executeBatch();
-                for (int r : resultados) {
-                    if (r == 0) {
+                ps.executeBatch();
+            }
+
+            for (Map.Entry<String, Integer> en : carrito.entrySet()) {
+                String key = en.getKey();
+                int productoId = ids.getOrDefault(key, 0);
+                if (productoId <= 0) {
+                    continue;
+                }
+
+                String tabla = ProductoDAO.tablaDesdeCategoria(categorias.get(key));
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE " + tabla + " SET stock = stock - ? WHERE id = ? AND stock >= ?")) {
+                    ps.setInt(1, en.getValue());
+                    ps.setInt(2, productoId);
+                    ps.setInt(3, en.getValue());
+                    if (ps.executeUpdate() == 0) {
                         conn.rollback();
                         return false;
                     }
@@ -828,6 +870,8 @@ public class VentaDAO {
             }
 
             conn.commit();
+            Conexion.invalidateCache(CACHE_PREFIX);
+            notificar();
             return true;
 
         } catch (Exception e) {
