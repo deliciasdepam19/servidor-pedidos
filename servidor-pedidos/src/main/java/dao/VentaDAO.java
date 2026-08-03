@@ -111,9 +111,11 @@ public class VentaDAO {
 
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT nombre, SUM(cantidad) as total "
-                    + "FROM ventas_rapidas "
-                    + "WHERE fecha::date = ? "
-                    + "GROUP BY nombre")) {
+                    + "FROM ventas_rapidas vr "
+                    + "LEFT JOIN ventas v ON v.id = vr.grupo_venta_id "
+                    + "WHERE vr.fecha::date = ? "
+                    + "AND (vr.tipo_pago != 'PENDIENTE' OR v.tipo_pago != 'PENDIENTE') "
+                    + "GROUP BY vr.nombre")) {
 
                 ps.setDate(1, sqlFecha);
 
@@ -472,8 +474,10 @@ public class VentaDAO {
             }
 
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COALESCE(SUM(cantidad), 0) FROM ventas_rapidas "
-                    + "WHERE fecha::date = ? AND grupo_venta_id IS NULL")) {
+                    "SELECT COALESCE(SUM(vr.cantidad), 0) FROM ventas_rapidas vr "
+                    + "LEFT JOIN ventas v ON v.id = vr.grupo_venta_id "
+                    + "WHERE vr.fecha::date = ? "
+                    + "AND (vr.tipo_pago != 'PENDIENTE' OR v.tipo_pago != 'PENDIENTE')")) {
                 ps.setDate(1, sqlFecha);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
