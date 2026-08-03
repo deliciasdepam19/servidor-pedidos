@@ -33,7 +33,8 @@ public class Conexion {
     private static final String POSTGRES_PASSWORD = getConfig("DB_PASSWORD");
 
     private static final String URL
-            = "jdbc:postgresql://" + POSTGRES_HOST + ":" + POSTGRES_PORT + "/" + POSTGRES_DB;
+            = "jdbc:postgresql://" + POSTGRES_HOST + ":" + POSTGRES_PORT + "/" + POSTGRES_DB
+            + "?sslmode=require&connectTimeout=10&socketTimeout=15";
 
     private static final long CACHE_TTL_MS = 2000;
 
