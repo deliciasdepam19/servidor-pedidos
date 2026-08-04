@@ -777,7 +777,7 @@ servidor.createContext("/img/", exchange -> {
                 || d.contains("pasteler") || d.contains("reposteri");
 
         if (esPanaderia) {
-            if (hora < 12 || hora >= 18) {
+            if (hora < 12 || hora >= 15) {
                 return "FUERA HORARIO";
 
             }
