@@ -565,6 +565,8 @@ servidor.createContext("/img/", exchange -> {
         String ip = obtenerIp(exchange);
         long ahora = System.currentTimeMillis();
 
+        System.out.println("[THROTTLE] IP detectada: " + ip);
+
         Long bloqueado = bloqueadoHasta.get(ip);
         if (bloqueado != null && ahora < bloqueado) {
             long min = (bloqueado - ahora) / 60_000 + 1;
@@ -578,6 +580,7 @@ servidor.createContext("/img/", exchange -> {
         Long ultimo = ultimoPedidoPorIp.get(ip);
         if (ultimo != null && (ahora - ultimo) < VENTANA_MS) {
             long segs = (VENTANA_MS - (ahora - ultimo)) / 1000 + 1;
+            System.out.println("[THROTTLE] Bloqueado por ventana: " + segs + "s restantes. IP: " + ip + ", ultimo: " + ultimo + ", ahora: " + ahora);
             return "{\"exito\":false,\"error\":\"Espera " + segs + " segundos antes de enviar otro pedido.\"}";
         }
 
