@@ -13,6 +13,7 @@ public class ReporteDAO {
                 + "COALESCE(total_pendiente, 0) AS total_pendiente, "
                 + "COALESCE(pedidos_web, 0) AS pedidos_web, "
                 + "COALESCE(pedidos_local, 0) AS pedidos_local, "
+                + "COALESCE(pedidos_app, 0) AS pedidos_app, "
                 + "COALESCE(generado_por, '') AS generado_por, "
                 + "COALESCE(detalle_categorias, '') AS detalle_categorias, "
                 + "COALESCE(gastos, 0) AS gastos "
@@ -37,6 +38,7 @@ public class ReporteDAO {
                     String.format("$%.0f", rs.getDouble("total_pendiente")),
                     String.valueOf(rs.getInt("pedidos_web")),
                     String.valueOf(rs.getInt("pedidos_local")),
+                    String.valueOf(rs.getInt("pedidos_app")),
                     rs.getString("generado_por"),
                     rs.getString("detalle_categorias"),
                     String.format("$%.0f", rs.getDouble("gastos"))
@@ -61,6 +63,7 @@ public class ReporteDAO {
                 + "COALESCE(total_pendiente, 0) AS total_pendiente, "
                 + "COALESCE(pedidos_web, 0) AS pedidos_web, "
                 + "COALESCE(pedidos_local, 0) AS pedidos_local, "
+                + "COALESCE(pedidos_app, 0) AS pedidos_app, "
                 + "COALESCE(generado_por, '') AS generado_por, "
                 + "COALESCE(detalle_categorias, '') AS detalle_categorias, "
                 + "COALESCE(gastos, 0) AS gastos "
@@ -84,6 +87,7 @@ public class ReporteDAO {
                     String.format("$%.0f", rs.getDouble("total_pendiente")),
                     String.valueOf(rs.getInt("pedidos_web")),
                     String.valueOf(rs.getInt("pedidos_local")),
+                    String.valueOf(rs.getInt("pedidos_app")),
                     rs.getString("generado_por"),
                     rs.getString("detalle_categorias"),
                     String.valueOf(rs.getDouble("gastos"))
