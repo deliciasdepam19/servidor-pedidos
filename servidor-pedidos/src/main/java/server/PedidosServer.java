@@ -446,6 +446,19 @@ public class PedidosServer {
             exchange.sendResponseHeaders(405, -1);
         });
 
+        servidor.createContext("/api/horarios", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("GET".equals(exchange.getRequestMethod())) {
+                enviarRespuesta(exchange, 200, construirJsonHorarios());
+                return;
+            }
+            exchange.sendResponseHeaders(405, -1);
+        });
+
         servidor.createContext("/api/cocina/pedidos", exchange -> {
 
             agregarCorsHeaders(exchange);
@@ -838,6 +851,31 @@ servidor.createContext("/img/", exchange -> {
         return cats.toString().toLowerCase();
     }
 
+    private static final int PANADERIA_APERTURA = 12, PANADERIA_CIERRE = 15;
+    private static final int PASTELERIA_APERTURA = 12, PASTELERIA_CIERRE = 22;
+    private static final int EMPANADA_APERTURA = 18, EMPANADA_CIERRE = 22;
+    private static final int GENERAL_APERTURA = 18, GENERAL_CIERRE = 22;
+
+    private String construirJsonHorarios() {
+        boolean webAbierta = EstadoWeb.abierta();
+        int hora = java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago")).getHour();
+
+        boolean panaderiaOk = webAbierta && hora >= PANADERIA_APERTURA && hora < PANADERIA_CIERRE;
+        boolean pasteleriaOk = webAbierta && hora >= PASTELERIA_APERTURA && hora < PASTELERIA_CIERRE;
+        boolean empanadaOk = webAbierta && hora >= EMPANADA_APERTURA && hora < EMPANADA_CIERRE;
+        boolean generalOk = webAbierta && hora >= GENERAL_APERTURA && hora < GENERAL_CIERRE;
+
+        return "{"
+                + "\"abierta\":" + webAbierta + ","
+                + "\"categorias\":{"
+                + "\"panaderia\":{\"disponible\":" + panaderiaOk + ",\"desde\":\"" + String.format("%02d:00", PANADERIA_APERTURA) + "\",\"hasta\":\"" + String.format("%02d:00", PANADERIA_CIERRE) + "\"},"
+                + "\"pasteleria\":{\"disponible\":" + pasteleriaOk + ",\"desde\":\"" + String.format("%02d:00", PASTELERIA_APERTURA) + "\",\"hasta\":\"" + String.format("%02d:00", PASTELERIA_CIERRE) + "\"},"
+                + "\"empanada\":{\"disponible\":" + empanadaOk + ",\"desde\":\"" + String.format("%02d:00", EMPANADA_APERTURA) + "\",\"hasta\":\"" + String.format("%02d:00", EMPANADA_CIERRE) + "\"},"
+                + "\"general\":{\"disponible\":" + generalOk + ",\"desde\":\"" + String.format("%02d:00", GENERAL_APERTURA) + "\",\"hasta\":\"" + String.format("%02d:00", GENERAL_CIERRE) + "\"}"
+                + "}"
+                + "}";
+    }
+
     private String calcularFranjaActual(String detalle, String categorias) {
         if (!EstadoWeb.abierta()) {
             return "FUERA HORARIO";
@@ -858,22 +896,22 @@ servidor.createContext("/img/", exchange -> {
         boolean esEmpanada = c.contains("empanada") || d.contains("empanada");
 
         if (esPanaderia) {
-            if (hora < 12 || hora >= 15) {
+            if (hora < PANADERIA_APERTURA || hora >= PANADERIA_CIERRE) {
                 return "FUERA HORARIO";
 
             }
         } else if (esAnticipado) {
-            if (hora < 12 || hora >= 22) {
+            if (hora < PASTELERIA_APERTURA || hora >= PASTELERIA_CIERRE) {
                 return "FUERA HORARIO";
 
             }
         } else if (esEmpanada) {
-            if (hora < 18 || hora >= 22) {
+            if (hora < EMPANADA_APERTURA || hora >= EMPANADA_CIERRE) {
                 return "FUERA HORARIO";
 
             }
         } else {
-            if (hora < 18 || hora >= 22) {
+            if (hora < GENERAL_APERTURA || hora >= GENERAL_CIERRE) {
                 return "FUERA HORARIO";
 
             }
