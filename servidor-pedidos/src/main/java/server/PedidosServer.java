@@ -130,17 +130,18 @@ public class PedidosServer {
                 return;
             }
             if ("POST".equals(exchange.getRequestMethod())) {
-                String errorThrottle = verificarThrottle(exchange, telefono);
-                if (errorThrottle != null) {
-                    enviarRespuesta(exchange, 429, errorThrottle);
-                    return;
-                }
                 String body = readBody(exchange);
 
                 synchronized (pedidoLock) {
                     try {
                         String cliente = sanitizar(extraerValor(body, "cliente"));
                         String telefono = sanitizar(extraerValor(body, "telefono"));
+
+                        String errorThrottle = verificarThrottle(exchange, telefono);
+                        if (errorThrottle != null) {
+                            enviarRespuesta(exchange, 429, errorThrottle);
+                            return;
+                        }
                         String detalle = construirDetalleDesdeItems(body);
                         if (detalle == null || detalle.isBlank()) {
                             detalle = sanitizar(extraerValor(body, "detalle"));
