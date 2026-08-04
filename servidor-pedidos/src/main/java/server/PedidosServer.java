@@ -855,6 +855,7 @@ servidor.createContext("/img/", exchange -> {
                 || d.contains("pan ");
         boolean esAnticipado = c.contains("pasteler") || c.contains("reposteri")
                 || d.contains("pasteler") || d.contains("reposteri");
+        boolean esEmpanada = c.contains("empanada") || d.contains("empanada");
 
         if (esPanaderia) {
             if (hora < 12 || hora >= 15) {
@@ -863,6 +864,11 @@ servidor.createContext("/img/", exchange -> {
             }
         } else if (esAnticipado) {
             if (hora < 12 || hora >= 22) {
+                return "FUERA HORARIO";
+
+            }
+        } else if (esEmpanada) {
+            if (hora < 18 || hora >= 22) {
                 return "FUERA HORARIO";
 
             }
@@ -1064,4 +1070,3 @@ servidor.createContext("/img/", exchange -> {
         new PedidosServer().iniciar();
     }
 }
-
