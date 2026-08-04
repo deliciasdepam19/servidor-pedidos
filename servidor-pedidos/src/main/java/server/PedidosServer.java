@@ -347,7 +347,7 @@ public class PedidosServer {
                 return;
             }
             if ("GET".equals(exchange.getRequestMethod())) {
-                enviarRespuesta(exchange, 200, "{\"abierta\":" + EstadoWeb.abierta + "}");
+                enviarRespuesta(exchange, 200, "{\"abierta\":" + EstadoWeb.abierta() + "}");
                 return;
             }
             if ("POST".equals(exchange.getRequestMethod())) {
@@ -357,9 +357,9 @@ public class PedidosServer {
                 }
                 String body = readBody(exchange);
                 String valor = extraerValor(body, "abierta");
-                EstadoWeb.abierta = "true".equals(valor);
-                System.out.println("[ESTADO WEB] â†’ " + (EstadoWeb.abierta ? "ABIERTA" : "CERRADA"));
-                enviarRespuesta(exchange, 200, "{\"ok\":true,\"abierta\":" + EstadoWeb.abierta + "}");
+                EstadoWeb.setAbierta(valor.isEmpty() || "-".equals(valor) ? null : "true".equals(valor));
+                System.out.println("[ESTADO WEB] → " + (EstadoWeb.abierta() ? "ABIERTA" : "CERRADA"));
+                enviarRespuesta(exchange, 200, "{\"ok\":true,\"abierta\":" + EstadoWeb.abierta() + "}");
                 return;
             }
             exchange.sendResponseHeaders(405, -1);
@@ -752,11 +752,11 @@ servidor.createContext("/img/", exchange -> {
     }
 
     private String calcularFranjaActual(String detalle, String categorias) {
-        if (!EstadoWeb.abierta) {
+        if (!EstadoWeb.abierta()) {
             return "FUERA HORARIO";
         }
 
-        java.time.LocalTime ahora = java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago"));
+        java.time.LocalTime ahora = java.time.LocalTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
         int hora = ahora.getHour(), minuto = ahora.getMinute();
         String d = detalle != null ? detalle.toLowerCase() : "";
         String c = categorias != null ? categorias.toLowerCase() : "";
@@ -821,7 +821,7 @@ servidor.createContext("/img/", exchange -> {
     }
 
     private String obtenerHoraExacta() {
-        return java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago"))
+        return java.time.LocalTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"))
                 .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
     }
 
