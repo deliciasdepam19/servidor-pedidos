@@ -1,33 +1,30 @@
 package server;
 
-import java.time.LocalTime;
-import java.time.ZoneId;
-
 public class EstadoWeb {
 
-    private static final ZoneId ZONA_CHILE = ZoneId.of("America/Santiago");
-    private static final int HORA_APERTURA = 12;
-    private static final int HORA_CIERRE = 15;
-
-    // Override manual del admin: null = automático, true/false = override
+    // Override manual del admin: null = automático (abierta por defecto), true/false = override
     private static volatile Boolean overrideManual = null;
 
     /**
-     * Determina si la panadería está abierta.
-     * Si hay override manual, usa ese valor.
-     * Si no, calcula automáticamente según la hora de Argentina (12:00-15:00).
+     * Determina si la web está habilitada para recibir pedidos.
+     * Este flag es el interruptor GENERAL de la tienda (no de una categoría en particular).
+     * El horario específico de cada categoría (panadería 12-15, pastelería 12-22,
+     * general 18-22, etc.) se valida aparte en PedidosServer.calcularFranjaActual().
+     *
+     * Si hay override manual del admin, se respeta ese valor.
+     * Si no, por defecto la tienda queda ABIERTA (el filtro real de horario
+     * lo hace calcularFranjaActual por categoría).
      */
     public static boolean abierta() {
         if (overrideManual != null) {
             return overrideManual;
         }
-        int hora = LocalTime.now(ZONA_CHILE).getHour();
-        return hora >= HORA_APERTURA && hora < HORA_CIERRE;
+        return true;
     }
 
     /**
      * Setea override manual del admin.
-     * Pasar null vuelve al modo automático.
+     * Pasar null vuelve al modo automático (abierta por defecto).
      */
     public static void setAbierta(Boolean valor) {
         overrideManual = valor;
