@@ -94,6 +94,37 @@ public class PedidosServer {
 
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
 
+        servidor.createContext("/api/pedidos/cliente", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("GET".equals(exchange.getRequestMethod())) {
+                String query = exchange.getRequestURI().getQuery();
+                String telefono = "";
+                if (query != null && query.contains("telefono=")) {
+                    telefono = query.split("telefono=")[1].split("&")[0];
+                }
+                List<PedidosDAO.PedidoBD> pedidos = pedidosDAO.cargarPedidosPorTelefono(telefono);
+                StringBuilder json = new StringBuilder("[");
+                for (int i = 0; i < pedidos.size(); i++) {
+                    PedidosDAO.PedidoBD p = pedidos.get(i);
+                    json.append("{")
+                            .append("\"id\":").append(p.id).append(",")
+                            .append("\"numero\":").append(p.numero).append(",")
+                            .append("\"cliente\":\"").append(escaparJson(p.cliente)).append("\",")
+                            .append("\"telefono\":\"").append(escaparJson(p.telefono)).append("\",")
+                            .append("\"detalle\":\"").append(escaparJson(p.detalle)).append("\",")
+                            .append("\"total\":").append(p.total).append(",")
+                            .append("\"estado\":\"").append(p.estado).append("\",")
+                            .append("\"fecha_hora\":\"").append(p.timestamp != null ? p.timestamp : "").append("\"")
+                            .append("}");
+                    if (i < pedidos.size() - 1) {
+                        json.append(",");
+                    }
+                }
+                json.append("]");
+                enviarRespuesta(exchange, 200, json.toString());
+            }
+        });
+
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {

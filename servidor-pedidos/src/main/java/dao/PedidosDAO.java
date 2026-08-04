@@ -214,6 +214,41 @@ public class PedidosDAO {
         return false;
     }
 
+    public List<PedidoBD> cargarPedidosPorTelefono(String telefono) {
+        List<PedidoBD> lista = new ArrayList<>();
+        String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
+                + "FROM pedidos "
+                + "WHERE telefono = ? "
+                + "AND estado NOT IN ('ELIMINADO') "
+                + "ORDER BY fecha_hora DESC LIMIT 20";
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, telefono);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        PedidoBD pb = new PedidoBD(
+                                rs.getInt("id"), rs.getInt("numero"),
+                                rs.getString("cliente"), rs.getString("telefono"),
+                                rs.getString("detalle"), rs.getDouble("total"),
+                                rs.getString("estado"), rs.getString("franja"),
+                                rs.getString("fecha_hora"));
+                        pb.origen = rs.getString("origen");
+                        lista.add(pb);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[PedidosDAO] " + e.getMessage());
+        } finally {
+            if (conn != null) {
+                Conexion.devolver(conn);
+            }
+        }
+        return lista;
+    }
+
     public List<PedidoBD> cargarPedidosDeHoy() {
         List<PedidoBD> lista = new ArrayList<>();
         String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, origen, fecha_hora "
