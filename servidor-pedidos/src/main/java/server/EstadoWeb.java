@@ -5,7 +5,7 @@ import java.time.ZoneId;
 
 public class EstadoWeb {
 
-    private static final ZoneId ZONA_ARGENTINA = ZoneId.of("America/Argentina/Buenos_Aires");
+    private static final ZoneId ZONA_CHILE = ZoneId.of("America/Santiago");
     private static final int HORA_APERTURA = 12;
     private static final int HORA_CIERRE = 15;
 
@@ -21,7 +21,7 @@ public class EstadoWeb {
         if (overrideManual != null) {
             return overrideManual;
         }
-        int hora = LocalTime.now(ZONA_ARGENTINA).getHour();
+        int hora = LocalTime.now(ZONA_CHILE).getHour();
         return hora >= HORA_APERTURA && hora < HORA_CIERRE;
     }
 

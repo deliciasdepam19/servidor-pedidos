@@ -756,7 +756,7 @@ servidor.createContext("/img/", exchange -> {
             return "FUERA HORARIO";
         }
 
-        java.time.LocalTime ahora = java.time.LocalTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
+        java.time.LocalTime ahora = java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago"));
         int hora = ahora.getHour(), minuto = ahora.getMinute();
         String d = detalle != null ? detalle.toLowerCase() : "";
         String c = categorias != null ? categorias.toLowerCase() : "";
@@ -821,7 +821,7 @@ servidor.createContext("/img/", exchange -> {
     }
 
     private String obtenerHoraExacta() {
-        return java.time.LocalTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"))
+        return java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago"))
                 .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
     }
 
