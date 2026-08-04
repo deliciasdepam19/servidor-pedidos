@@ -130,7 +130,7 @@ public class PedidosServer {
                 return;
             }
             if ("POST".equals(exchange.getRequestMethod())) {
-                String errorThrottle = verificarThrottle(exchange);
+                String errorThrottle = verificarThrottle(exchange, telefono);
                 if (errorThrottle != null) {
                     enviarRespuesta(exchange, 429, errorThrottle);
                     return;
@@ -561,42 +561,45 @@ servidor.createContext("/img/", exchange -> {
         return exchange.getRemoteAddress().getAddress().getHostAddress();
     }
 
-    private String verificarThrottle(HttpExchange exchange) {
-        String ip = obtenerIp(exchange);
+    private String verificarThrottle(HttpExchange exchange, String telefono) {
+        // Usar teléfono como identificador (si está disponible), si no IP
+        String id = (telefono != null && !telefono.isBlank() && !"-".equals(telefono))
+                ? "tel:" + telefono
+                : "ip:" + obtenerIp(exchange);
         long ahora = System.currentTimeMillis();
 
-        System.out.println("[THROTTLE] IP detectada: " + ip);
+        System.out.println("[THROTTLE] Identificador: " + id);
 
-        Long bloqueado = bloqueadoHasta.get(ip);
+        Long bloqueado = bloqueadoHasta.get(id);
         if (bloqueado != null && ahora < bloqueado) {
             long min = (bloqueado - ahora) / 60_000 + 1;
             return "{\"exito\":false,\"error\":\"Demasiados intentos. Reintenta en " + min + " minutos.\"}";
         } else if (bloqueado != null) {
-            bloqueadoHasta.remove(ip);
-            contadorPorIp.remove(ip);
-            ultimoPedidoPorIp.remove(ip);
+            bloqueadoHasta.remove(id);
+            contadorPorIp.remove(id);
+            ultimoPedidoPorIp.remove(id);
         }
 
-        Long ultimo = ultimoPedidoPorIp.get(ip);
+        Long ultimo = ultimoPedidoPorIp.get(id);
         if (ultimo != null && (ahora - ultimo) < VENTANA_MS) {
             long segs = (VENTANA_MS - (ahora - ultimo)) / 1000 + 1;
-            System.out.println("[THROTTLE] Bloqueado por ventana: " + segs + "s restantes. IP: " + ip + ", ultimo: " + ultimo + ", ahora: " + ahora);
+            System.out.println("[THROTTLE] Bloqueado por ventana: " + segs + "s restantes. ID: " + id + ", ultimo: " + ultimo + ", ahora: " + ahora);
             return "{\"exito\":false,\"error\":\"Espera " + segs + " segundos antes de enviar otro pedido.\"}";
         }
 
-        int contador = contadorPorIp.getOrDefault(ip, 0);
+        int contador = contadorPorIp.getOrDefault(id, 0);
         if (ultimo != null && (ahora - ultimo) >= HORA_MS) {
             contador = 0;
-            contadorPorIp.put(ip, 0);
+            contadorPorIp.put(id, 0);
         }
 
         if (contador >= MAX_PEDIDOS_HORA) {
-            bloqueadoHasta.put(ip, ahora + BLOQUEO_MS);
-            return "{\"exito\":false,\"error\":\"Demasiados pedidos. IP bloqueada durante 30 minutos.\"}";
+            bloqueadoHasta.put(id, ahora + BLOQUEO_MS);
+            return "{\"exito\":false,\"error\":\"Demasiados pedidos. Cuenta bloqueada durante 30 minutos.\"}";
         }
 
-        ultimoPedidoPorIp.put(ip, ahora);
-        contadorPorIp.put(ip, contador + 1);
+        ultimoPedidoPorIp.put(id, ahora);
+        contadorPorIp.put(id, contador + 1);
         return null;
     }
 
