@@ -620,6 +620,44 @@ public class VentaDAO {
         }
     }
 
+    public int contarVentasApp(String fecha) {
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            java.sql.Date sqlFecha = java.sql.Date.valueOf(fecha);
+
+            int desdeVentas = 0;
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE' AND origen = 'APP'")) {
+                ps.setDate(1, sqlFecha);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        desdeVentas = rs.getInt(1);
+                    }
+                }
+            }
+
+            int desdePedidos = 0;
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM pedidos WHERE fecha_hora::date = ? AND origen = 'APP' AND estado = 'COBRADO'")) {
+                ps.setDate(1, sqlFecha);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        desdePedidos = rs.getInt(1);
+                    }
+                }
+            }
+
+            return desdeVentas + desdePedidos;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        } finally {
+            cerrarConexion(conn);
+        }
+    }
+
     // ── Firma actualizada: agrega parámetro gastos ────────────────────────────
     public int guardarReporteYReiniciar(
             double total,
@@ -667,6 +705,7 @@ public class VentaDAO {
             double pendiente = totalPendienteDelDia(fecha);
             int pedidosWeb = contarVentasWeb(fecha);
             int pedidosLocal = contarVentasLocal(fecha);
+            int pedidosApp = contarVentasApp(fecha);
 
             double liquidadoEfectivo = 0;
             double liquidadoTransferencia = 0;
@@ -692,8 +731,8 @@ public class VentaDAO {
             // ── INSERT reporte ────────────────────────────────────────────────
             try (PreparedStatement psReporte = conn.prepareStatement(
                     "INSERT INTO reportes (fecha, total, total_efectivo, total_transferencia, "
-                    + "total_pendiente, generado_por, detalle, pedidos_web, pedidos_local, detalle_categorias, gastos) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                    + "total_pendiente, generado_por, detalle, pedidos_web, pedidos_local, pedidos_app, detalle_categorias, gastos) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
 
                 psReporte.setDate(1, java.sql.Date.valueOf(fecha));
                 psReporte.setDouble(2, total + liquidadoEfectivo + liquidadoTransferencia);
@@ -704,8 +743,9 @@ public class VentaDAO {
                 psReporte.setString(7, detalleStr.toString());
                 psReporte.setInt(8, pedidosWeb);
                 psReporte.setInt(9, pedidosLocal);
-                psReporte.setString(10, detalleCats.toString());
-                psReporte.setDouble(11, gastos);   // ← usa el parámetro
+                psReporte.setInt(10, pedidosApp);
+                psReporte.setString(11, detalleCats.toString());
+                psReporte.setDouble(12, gastos);   // ← usa el parámetro
                 psReporte.executeUpdate();
             }
 
