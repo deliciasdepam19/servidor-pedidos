@@ -125,6 +125,55 @@ public class PedidosServer {
             }
         });
 
+        servidor.createContext("/api/pedidos/activo", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("GET".equals(exchange.getRequestMethod())) {
+                String query = exchange.getRequestURI().getQuery();
+                String telefono = "";
+                if (query != null && query.contains("telefono=")) {
+                    telefono = query.split("telefono=")[1].split("&")[0];
+                }
+                PedidosDAO.PedidoBD p = pedidosDAO.cargarPedidoActivo(telefono);
+                if (p != null) {
+                    String json = "{"
+                            + "\"activo\":true,"
+                            + "\"id\":" + p.id + ","
+                            + "\"numero\":" + p.numero + ","
+                            + "\"cliente\":\"" + escaparJson(p.cliente) + "\","
+                            + "\"telefono\":\"" + escaparJson(p.telefono) + "\","
+                            + "\"detalle\":\"" + escaparJson(p.detalle) + "\","
+                            + "\"total\":" + p.total + ","
+                            + "\"estado\":\"" + p.estado + "\","
+                            + "\"hora\":\"" + (p.timestamp != null ? p.timestamp : "") + "\""
+                            + "}";
+                    enviarRespuesta(exchange, 200, json);
+                } else {
+                    enviarRespuesta(exchange, 200, "{\"activo\":false}");
+                }
+            }
+        });
+
+        servidor.createContext("/api/pedidos/", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            String path = exchange.getRequestURI().getPath();
+            // PUT /api/pedidos/{id}/estado
+            if ("PUT".equals(exchange.getRequestMethod()) && path.matches("/api/pedidos/\\d+/estado")) {
+                try {
+                    int id = Integer.parseInt(path.split("/")[3]);
+                    String body = readBody(exchange);
+                    String nuevoEstado = extraerValor(body, "estado");
+                    boolean ok = pedidosDAO.actualizarEstado(id, nuevoEstado);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
+                } catch (Exception e) {
+                    enviarRespuesta(exchange, 400, "{\"exito\":false}");
+                }
+            }
+        });
+
         servidor.createContext("/api/pedidos/historico", exchange -> {
             agregarCorsHeaders(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
