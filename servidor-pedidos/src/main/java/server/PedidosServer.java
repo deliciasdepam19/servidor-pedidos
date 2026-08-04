@@ -68,7 +68,7 @@ public class PedidosServer {
 
     // ── Rate limiting ────────────────────────────────────────────────────
     private static final long VENTANA_MS = 10_000L;
-    private static final int MAX_PEDIDOS_HORA = 5;
+    private static final int MAX_PEDIDOS_HORA = 50;   //volver a 5
     private static final long HORA_MS = 60 * 60 * 1000L;
     private static final long BLOQUEO_MS = 30 * 60 * 1000L;
 
