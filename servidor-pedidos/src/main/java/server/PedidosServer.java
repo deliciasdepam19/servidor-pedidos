@@ -590,6 +590,43 @@ servidor.createContext("/img/", exchange -> {
     }
 });
 
+        // ── Productos rápidos (panes) ──────────────────────────────────────────
+        servidor.createContext("/api/productos-rapidos", exchange -> {
+
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if ("GET".equals(exchange.getRequestMethod())) {
+                try {
+                    dao.ProductoRapidoDAO dao = new dao.ProductoRapidoDAO();
+                    List<Object[]> productos = dao.listar();
+
+                    StringBuilder json = new StringBuilder("[");
+                    for (int i = 0; i < productos.size(); i++) {
+                        Object[] p = productos.get(i);
+                        json.append("{\"id\":").append(p[0])
+                            .append(",\"nombre\":\"").append(escaparJson((String)p[1]))
+                            .append("\",\"precio\":").append(p[2]).append("}");
+                        if (i < productos.size() - 1) json.append(",");
+                    }
+                    json.append("]");
+
+                    exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                    byte[] b = json.toString().getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, b.length);
+                    exchange.getResponseBody().write(b);
+                    exchange.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    enviarRespuesta(exchange, 500, "{\"error\":\"Error\"}");
+                }
+            }
+        });
+
         // ── Notificaciones para app ────────────────────────────────────────────
         servidor.createContext("/api/notificaciones", exchange -> {
 
