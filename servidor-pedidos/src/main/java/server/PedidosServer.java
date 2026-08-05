@@ -876,6 +876,12 @@ servidor.createContext("/img/", exchange -> {
                 + "}";
     }
 
+    private String normalizar(String s) {
+        if (s == null) return "";
+        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase();
+    }
+
     private String calcularFranjaActual(String detalle, String categorias) {
         if (!EstadoWeb.abierta()) {
             return "FUERA HORARIO";
@@ -883,14 +889,15 @@ servidor.createContext("/img/", exchange -> {
 
         java.time.LocalTime ahora = java.time.LocalTime.now(java.time.ZoneId.of("America/Santiago"));
         int hora = ahora.getHour(), minuto = ahora.getMinute();
-        String d = detalle != null ? detalle.toLowerCase() : "";
-        String c = categorias != null ? categorias.toLowerCase() : "";
+        String d = normalizar(detalle);
+        String c = normalizar(categorias);
 
-        boolean esPanaderia = c.contains("panaderia") || c.contains("panaderÃ­a")
-                || d.contains("panaderia") || d.contains("panaderÃ­a")
-                || d.contains("hallula") || d.contains("marraqueta")
+        boolean esPanaderia = c.contains("panaderia")
+                || d.contains("panaderia")
+                || d.contains("hallulla") || d.contains("marraqueta")
                 || d.contains("dobladita") || d.contains("pan amasado")
-                || d.contains("pan ");
+                || d.contains("coliza") || d.contains("amasado")
+                || d.contains("integral") || d.contains("pan ");
         boolean esAnticipado = c.contains("pasteler") || c.contains("reposteri")
                 || d.contains("pasteler") || d.contains("reposteri");
         boolean esEmpanada = c.contains("empanada") || d.contains("empanada");
