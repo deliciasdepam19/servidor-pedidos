@@ -614,8 +614,10 @@ servidor.createContext("/img/", exchange -> {
                     notif.put("mensaje", mensaje);
                     notif.put("icono", "-".equals(icono) ? "bell-outline" : icono);
                     notif.put("color", "-".equals(color) ? "#40cee0" : color);
-                    notif.put("fecha", new java.text.SimpleDateFormat("dd/MM/yyyy").format(new java.util.Date()));
-                    notif.put("hora", new java.text.SimpleDateFormat("HH:mm").format(new java.util.Date()));
+                    java.time.ZoneId chile = java.time.ZoneId.of("America/Santiago");
+                    java.time.ZonedDateTime now = java.time.ZonedDateTime.now(chile);
+                    notif.put("fecha", now.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+                    notif.put("hora", now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
                     notif.put("createdAt", System.currentTimeMillis());
                     notificaciones.add(notif);
 
