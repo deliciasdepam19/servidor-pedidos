@@ -36,6 +36,7 @@ public class PedidosServer {
     private final RecetaDAO recetaDAO = new RecetaDAO();
     private final InventarioDAO invDAO = new InventarioDAO();
     private final AdminDAO adminDAO = new AdminDAO();
+    private final List<Map<String, Object>> notificaciones = new ArrayList<>();
 
     private final Object pedidoLock = new Object();
 
@@ -588,6 +589,76 @@ servidor.createContext("/img/", exchange -> {
         exchange.close();
     }
 });
+
+        // ── Notificaciones para app ────────────────────────────────────────────
+        servidor.createContext("/api/notificaciones", exchange -> {
+
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String titulo = extraerValor(body, "titulo");
+                    String mensaje = extraerValor(body, "mensaje");
+                    String icono = extraerValor(body, "icono");
+                    String color = extraerValor(body, "color");
+
+                    Map<String, Object> notif = new LinkedHashMap<>();
+                    notif.put("id", notificaciones.size() + 1);
+                    notif.put("titulo", titulo);
+                    notif.put("mensaje", mensaje);
+                    notif.put("icono", "-".equals(icono) ? "bell-outline" : icono);
+                    notif.put("color", "-".equals(color) ? "#40cee0" : color);
+                    notif.put("fecha", new java.text.SimpleDateFormat("dd/MM/yyyy").format(new java.util.Date()));
+                    notif.put("hora", new java.text.SimpleDateFormat("HH:mm").format(new java.util.Date()));
+                    notif.put("createdAt", System.currentTimeMillis());
+                    notificaciones.add(notif);
+
+                    enviarRespuesta(exchange, 200, "{\"exito\":true,\"id\":" + notif.get("id") + "}");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    enviarRespuesta(exchange, 400, "{\"exito\":false}");
+                }
+            }
+
+            if ("GET".equals(exchange.getRequestMethod())) {
+                try {
+                    int start = Math.max(0, notificaciones.size() - 50);
+                    List<Map<String, Object>> recent = notificaciones.subList(start, notificaciones.size());
+
+                    StringBuilder json = new StringBuilder("[");
+                    for (int i = 0; i < recent.size(); i++) {
+                        Map<String, Object> n = recent.get(i);
+                        json.append("{");
+                        json.append("\"id\":").append(n.get("id")).append(",");
+                        json.append("\"titulo\":\"").append(escaparJson((String)n.get("titulo"))).append("\",");
+                        json.append("\"mensaje\":\"").append(escaparJson((String)n.get("mensaje"))).append("\",");
+                        json.append("\"icono\":\"").append(escaparJson((String)n.get("icono"))).append("\",");
+                        json.append("\"color\":\"").append(escaparJson((String)n.get("color"))).append("\",");
+                        json.append("\"fecha\":\"").append(escaparJson((String)n.get("fecha"))).append("\",");
+                        json.append("\"hora\":\"").append(escaparJson((String)n.get("hora"))).append("\",");
+                        json.append("\"createdAt\":").append(n.get("createdAt"));
+                        json.append("}");
+                        if (i < recent.size() - 1) json.append(",");
+                    }
+                    json.append("]");
+
+                    exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                    byte[] b = json.toString().getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, b.length);
+                    exchange.getResponseBody().write(b);
+                    exchange.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    enviarRespuesta(exchange, 500, "{\"error\":\"Error\"}");
+                }
+            }
+        });
 
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);

@@ -390,6 +390,7 @@
     const POLL_MS = 5000;
     const MOCK = false;
     var ultimosDatos = null;
+    var snapshotPedidos = '';  // Para detectar cambios reales
 
     function actualizarReloj() {
       var a = new Date();
@@ -419,6 +420,11 @@
 
     function renderizar(d) {
       var pedidos = d.pedidos || [];
+
+      // ── Skip si no cambiaron los pedidos ──────────────────────────────
+      var nuevoSnapshot = JSON.stringify(pedidos.map(function(p) { return [p.numero, p.estado]; }).sort(function(a,b){ return a[0] < b[0] ? -1 : 1; }));
+      if (nuevoSnapshot === snapshotPedidos) return;
+      snapshotPedidos = nuevoSnapshot;
 
       // ── Empty state: solo show/hide, nunca reconstruir ──────────────
       var emptyEl = document.getElementById('empty-state');
@@ -474,6 +480,15 @@
           }
         }
       });
+
+      // Actualizar estado de cards existentes (PENDIENTE → EN PROCESO)
+      for (var i = 0; i < pedidos.length; i++) {
+        var p = pedidos[i];
+        var card = grid.querySelector('[data-pedido-id="' + p.numero + '"]');
+        if (!card) continue;
+        var ec = p.estado === 'EN PROCESO' ? 'estado-proceso' : '';
+        card.className = 'pedido-card ' + ec;
+      }
 
       // Agregar cards nuevas
       for (var i = 0; i < pedidos.length; i++) {
