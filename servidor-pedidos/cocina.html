@@ -129,6 +129,9 @@
       padding: 16px 12px;
       border-left: 1px solid rgba(64, 206, 224, 0.1);
       overflow-y: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     /* SIDEBAR */
@@ -139,6 +142,7 @@
       color: #6a8f96;
       margin-bottom: 12px;
       letter-spacing: 2px;
+      text-align: center;
     }
 
     .sidebar-cat {
@@ -146,7 +150,10 @@
       justify-content: space-between;
       align-items: center;
       padding: 10px 12px;
-      margin-bottom: 4px;
+      margin: 0 auto 4px;
+      width: fit-content;
+      min-width: 190px;
+      max-width: 100%;
       border-radius: 8px;
       font-family: 'Inter', sans-serif;
       font-size: 15px;
