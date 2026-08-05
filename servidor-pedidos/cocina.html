@@ -666,9 +666,18 @@
 
     // ── Sonido de notificación (timbre tipo doorbell) ──────────────────────
     var audioCtx = null;
+    function ensureAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+    // Desbloquear AudioContext en el primer click del usuario
+    document.addEventListener('click', function desbloquear() {
+      ensureAudioCtx();
+      document.removeEventListener('click', desbloquear);
+    });
     function tocarTimbre() {
       try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        ensureAudioCtx();
         var ahora = audioCtx.currentTime;
         // Dos tonos: ding-dong
         [0, 0.18].forEach(function (offset, i) {
