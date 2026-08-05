@@ -139,4 +139,25 @@ public class ProductoRapidoDAO {
             }
         }
     }
+
+    public void limpiarDuplicados() {
+        String sql = "DELETE FROM productos_rapidos WHERE id NOT IN " +
+                "(SELECT MIN(id) FROM productos_rapidos GROUP BY LOWER(nombre))";
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            PreparedStatement ps = conn.prepareStatement(sql);
+            int eliminados = ps.executeUpdate();
+            ps.close();
+            if (eliminados > 0) {
+                System.out.println("PRODUCTOS_RAPIDOS: eliminados " + eliminados + " duplicados");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error limpiando duplicados: " + e.getMessage());
+        } finally {
+            if (conn != null) {
+                Conexion.devolver(conn);
+            }
+        }
+    }
 }

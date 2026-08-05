@@ -1177,6 +1177,7 @@ servidor.createContext("/img/", exchange -> {
     }
 
     public void iniciar() {
+        new dao.ProductoRapidoDAO().limpiarDuplicados();
         servidor.start();
     }
 
