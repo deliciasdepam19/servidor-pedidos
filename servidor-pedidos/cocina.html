@@ -10,6 +10,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
     rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
   <style>
     * {
       margin: 0;
@@ -70,36 +71,55 @@
     }
 
     .badge-top {
-      display: inline-block;
-      padding: 8px 18px;
-      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
       font-family: 'Inter', sans-serif;
-      font-size: 18px;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge-top i {
+      font-size: 14px;
+    }
+
+    .badge-top .badge-count {
+      opacity: 0.6;
     }
 
     .badge-top-web {
-      background: rgba(64, 206, 224, 0.12);
+      background: rgba(64, 206, 224, 0.1);
       color: #40cee0;
-      border: 1px solid rgba(64, 206, 224, 0.2);
     }
 
     .badge-top-local {
       background: rgba(130, 224, 170, 0.1);
       color: #82e0aa;
-      border: 1px solid rgba(130, 224, 170, 0.2);
     }
 
     .badge-top-app {
-      background: rgba(180, 130, 255, 0.12);
+      background: rgba(180, 130, 255, 0.1);
       color: #c7a6ff;
-      border: 1px solid rgba(180, 130, 255, 0.25);
     }
 
-    .badge-top-total {
-      background: rgba(255, 180, 100, 0.12);
-      color: #ffb464;
-      border: 1px solid rgba(255, 180, 100, 0.2);
+    #badge-sonido {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: rgba(64, 206, 224, 0.1);
+      color: #40cee0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #badge-sonido.muted {
+      background: rgba(255, 255, 255, 0.05);
+      color: #6a8f96;
     }
 
     #reloj {
@@ -143,6 +163,29 @@
       margin-bottom: 12px;
       letter-spacing: 2px;
       text-align: center;
+    }
+
+    #total-pedidos-card {
+      background: rgba(255, 180, 100, 0.08);
+      border: 1px solid rgba(255, 180, 100, 0.15);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    #total-pedidos-card p {
+      font-size: 10px;
+      color: #6a8f96;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 0 0 2px;
+    }
+
+    #total-pedidos-card span {
+      font-size: 22px;
+      font-weight: 500;
+      color: #ffb464;
     }
 
     .sidebar-cat {
@@ -344,9 +387,9 @@
 
   <div id="topbar">
     <div class="topbar-left">
-      <span class="badge-top badge-top-web" id="badge-web">WEB (0)</span>
-      <span class="badge-top badge-top-local" id="badge-local">LOCAL (0)</span>
-      <span class="badge-top badge-top-app" id="badge-app">APP (0)</span>
+      <span class="badge-top badge-top-web" id="badge-web"><i class="ti ti-world" aria-hidden="true"></i>WEB <span class="badge-count">0</span></span>
+      <span class="badge-top badge-top-local" id="badge-local"><i class="ti ti-building-store" aria-hidden="true"></i>LOCAL <span class="badge-count">0</span></span>
+      <span class="badge-top badge-top-app" id="badge-app"><i class="ti ti-device-mobile" aria-hidden="true"></i>APP <span class="badge-count">0</span></span>
     </div>
 
     <div class="topbar-center">
@@ -354,8 +397,8 @@
     </div>
 
     <div class="topbar-right">
-      <span class="badge-top badge-top-total" id="badge-total">TOTAL 0</span>
       <div id="reloj">--:--</div>
+      <div id="badge-sonido" role="img" aria-label="Sonido de notificaciones activado"><i class="ti ti-volume" aria-hidden="true"></i></div>
     </div>
   </div>
 
@@ -374,6 +417,10 @@
       <div id="pedidos-grid"></div>
     </div>
     <aside id="sidebar">
+      <div id="total-pedidos-card">
+        <p>Total pedidos</p>
+        <span id="sidebar-total-pedidos">0</span>
+      </div>
       <h3>Panadería</h3>
       <div id="sidebar-content">
         <div class="sidebar-cat"><span>Amasados</span><span class="count" id="count-amasados">0</span></div>
@@ -548,10 +595,10 @@
 
     // ── Badges: solo actualizar textContent, nunca reconstruir ────────
     function actualizarBadges(web, local, app, total) {
-      document.getElementById('badge-web').textContent = 'WEB (' + web + ')';
-      document.getElementById('badge-local').textContent = 'LOCAL (' + local + ')';
-      document.getElementById('badge-app').textContent = 'APP (' + app + ')';
-      document.getElementById('badge-total').textContent = 'TOTAL PEDIDOS ' + total;
+      document.querySelector('#badge-web .badge-count').textContent = web;
+      document.querySelector('#badge-local .badge-count').textContent = local;
+      document.querySelector('#badge-app .badge-count').textContent = app;
+      document.getElementById('sidebar-total-pedidos').textContent = total;
     }
 
     // ── Sidebar: solo actualizar counts por ID, nunca innerHTML ───────
