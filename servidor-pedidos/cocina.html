@@ -575,9 +575,35 @@
           var catItem = (items[j].categoria || '').toLowerCase();
           var cant = items[j].cantidad;
 
-          if (nom.indexOf('empanada') >= 0 || catItem.indexOf('empanada') >= 0) {
+          if (catItem.indexOf('pasteler') >= 0) {
+            cats.pasteleria += cant;
+          } else if (catItem.indexOf('reposter') >= 0) {
+            cats.reposteria += cant;
+          } else if (catItem.indexOf('empanada') >= 0) {
             cats.empanadas += cant;
-          } else if (nom.indexOf('sopaipilla') >= 0 || catItem.indexOf('sopaipilla') >= 0) {
+          } else if (catItem.indexOf('sopaipilla') >= 0) {
+            cats.sopaipillas += cant;
+          } else if (catItem.indexOf('panader') >= 0) {
+            if (nom.indexOf('hallulla grande') >= 0) {
+              cats.hallullaGrande += cant;
+            } else if (nom.indexOf('hallulla') >= 0) {
+              cats.hallullas += cant;
+            } else if (nom.indexOf('amasado') >= 0) {
+              cats.amasados += cant;
+            } else if (nom.indexOf('coliza') >= 0) {
+              cats.colizas += cant;
+            } else if (nom.indexOf('dobladita') >= 0) {
+              cats.dobladitas += cant;
+            } else if (nom.indexOf('integral') >= 0) {
+              cats.integrales += cant;
+            } else {
+              cats.otros += cant;
+            }
+          } else if (catItem.indexOf('otro') >= 0) {
+            cats.otros += cant;
+          } else if (nom.indexOf('empanada') >= 0) {
+            cats.empanadas += cant;
+          } else if (nom.indexOf('sopaipilla') >= 0) {
             cats.sopaipillas += cant;
           } else if (nom.indexOf('integral') >= 0) {
             cats.integrales += cant;
@@ -591,15 +617,9 @@
             cats.hallullas += cant;
           } else if (nom.indexOf('dobladita') >= 0) {
             cats.dobladitas += cant;
-          } else if (
-            catItem.indexOf('reposter') >= 0 ||
-            /kuchen|torta|queque|alfajor|brownie|tarta|cheesecake|milhoja|mousse|reposter/.test(nom)
-          ) {
+          } else if (/kuchen|torta|queque|alfajor|brownie|tarta|cheesecake|milhoja|mousse|reposter/.test(nom)) {
             cats.reposteria += cant;
-          } else if (
-            catItem.indexOf('pasteler') >= 0 ||
-            /pastel|berlin|suspiro|pie de limon|pie de manzana|pasteler/.test(nom)
-          ) {
+          } else if (/pastel|berlin|suspiro|pie de limon|pie de manzana|pasteler/.test(nom)) {
             cats.pasteleria += cant;
           } else {
             cats.otros += cant;
