@@ -441,16 +441,16 @@
         <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total">0</span></div>
       </div>
       <h3>Empanadas</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total">0</span></div>
+      <div id="sidebar-empanadas">
+        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-empanadas-total">0</span></div>
       </div>
       <h3>Repostería</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total">0</span></div>
+      <div id="sidebar-reposteria">
+        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-reposteria-total">0</span></div>
       </div>
       <h3>Pastelería</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total">0</span></div>
+      <div id="sidebar-pasteleria">
+        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-pasteleria-total">0</span></div>
       </div>
     </aside>
   </div>
@@ -497,7 +497,7 @@
         emptyEl.style.display = 'flex';
         grid.innerHTML = '';
         actualizarBadges(0, 0, 0, 0);
-        renderSidebarTotales(0, 0, 0, 0, 0, 0, 0);
+        renderSidebarTotales(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         return;
       }
       emptyEl.style.display = 'none';
@@ -513,6 +513,7 @@
 
       // ── Sidebar: solo actualizar counts ─────────────────────────────
       var cats = { amasados: 0, colizas: 0, hallullas: 0, dobladitas: 0, integrales: 0, hallullaGrande: 0 };
+      var catsExtras = { empanadas: 0, reposteria: 0, pasteleria: 0 };
       for (var i = 0; i < pedidos.length; i++) {
         var items = pedidos[i].items || [];
         for (var j = 0; j < items.length; j++) {
@@ -525,9 +526,24 @@
           else if (nom.indexOf('hallulla') >= 0) cats.hallullas += cant;
           else if (nom.indexOf('dobladita') >= 0) cats.dobladitas += cant;
         }
+        // Parsear campo cats del pedido (formato: "empanada:3,reposteria:2,pasteleria:1")
+        var catsStr = pedidos[i].cats || '';
+        if (catsStr) {
+          var partes = catsStr.split(',');
+          for (var k = 0; k < partes.length; k++) {
+            var kv = partes[k].split(':');
+            if (kv.length === 2) {
+              var key = kv[0].toLowerCase().trim();
+              var val = parseInt(kv[1], 10) || 0;
+              if (key.indexOf('empan') >= 0) catsExtras.empanadas += val;
+              else if (key.indexOf('repost') >= 0) catsExtras.reposteria += val;
+              else if (key.indexOf('pastel') >= 0) catsExtras.pasteleria += val;
+            }
+          }
+        }
       }
       var totalPan = cats.amasados + cats.colizas + cats.hallullas + cats.hallullaGrande + cats.dobladitas + cats.integrales;
-      renderSidebarTotales(cats.amasados, cats.colizas, cats.hallullas, cats.hallullaGrande, cats.dobladitas, cats.integrales, totalPan);
+      renderSidebarTotales(cats.amasados, cats.colizas, cats.hallullas, cats.hallullaGrande, cats.dobladitas, cats.integrales, totalPan, catsExtras.empanadas, catsExtras.reposteria, catsExtras.pasteleria);
 
       // ── Grid: diff inteligente — solo agregar/quitar cards ──────────
       var idsActuales = new Set();
@@ -610,7 +626,7 @@
     }
 
     // ── Sidebar: solo actualizar counts por ID, nunca innerHTML ───────
-    function renderSidebarTotales(amasados, colizas, hallullas, hallullaGrande, dobladitas, integrales, total) {
+    function renderSidebarTotales(amasados, colizas, hallullas, hallullaGrande, dobladitas, integrales, total, empanadas, reposteria, pasteleria) {
       var map = {
         'count-amasados': amasados,
         'count-colizas': colizas,
@@ -618,7 +634,10 @@
         'count-hallulla-grande': hallullaGrande,
         'count-dobladitas': dobladitas,
         'count-integrales': integrales,
-        'count-total': total
+        'count-total': total,
+        'count-empanadas-total': empanadas,
+        'count-reposteria-total': reposteria,
+        'count-pasteleria-total': pasteleria
       };
       for (var id in map) {
         var el = document.getElementById(id);
