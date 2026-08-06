@@ -251,12 +251,9 @@
 
     /* GRID */
     #pedidos-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 10px;
+      columns: 280px;
+      column-gap: 10px;
       overflow: hidden;
-      align-content: start;
-      align-items: start;
     }
 
     #sin-conexion {
@@ -305,6 +302,10 @@
       border: 1px solid rgba(64, 206, 224, 0.12);
       border-left: 4px solid #40cee0;
       transition: opacity 0.5s ease;
+      break-inside: avoid;
+      margin-bottom: 10px;
+      display: inline-block;
+      width: 100%;
     }
 
     .pedido-card.estado-proceso {
@@ -392,7 +393,7 @@
       }
 
       #pedidos-grid {
-        grid-template-columns: 1fr;
+        columns: 1;
       }
 
       #reloj {
