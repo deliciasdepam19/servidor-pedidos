@@ -571,14 +571,51 @@
       function sinTildes(s) {
         return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       }
+      // Mapa explícito de productos rápidos (nombre → categoría), según catálogo real.
+      // Se revisa en orden: las claves más específicas van primero para no
+      // confundir "paleta grande" con "paleta", etc.
+      var productosRapidos = [
+        ['papas fritas chicas', 'otros'],
+        ['papas fritas grandes', 'otros'],
+        ['trozo de pizza', 'otros'],
+        ['frutos secos', 'otros'],
+        ['mini donas', 'reposteria'],
+        ['donas', 'reposteria'],
+        ['queque', 'reposteria'],
+        ['alfajor', 'reposteria'],
+        ['cakepops', 'reposteria'],
+        ['palmeritas', 'reposteria'],
+        ['paleta grande', 'reposteria'],
+        ['paleta', 'reposteria'],
+        ['mantecados', 'reposteria'],
+        ['kuchen', 'pasteleria'],
+        ['pie de limon', 'pasteleria'],
+        ['pie de manzana', 'pasteleria'],
+        ['torta rusa', 'pasteleria'],
+        ['tartaleta', 'pasteleria'],
+        ['berlin', 'pasteleria']
+      ];
       for (var i = 0; i < pedidos.length; i++) {
         var items = pedidos[i].items || [];
         for (var j = 0; j < items.length; j++) {
           var nom = sinTildes((items[j].producto || '').toLowerCase());
           var catItem = sinTildes((items[j].categoria || '').toLowerCase());
           var cant = items[j].cantidad;
+          var claveRapida = null;
+          for (var k = 0; k < productosRapidos.length; k++) {
+            if (nom.indexOf(productosRapidos[k][0]) >= 0) {
+              claveRapida = productosRapidos[k][1];
+              break;
+            }
+          }
 
-          if (nom.indexOf('empanada') >= 0) {
+          if (claveRapida === 'otros') {
+            cats.otros += cant;
+          } else if (claveRapida === 'reposteria') {
+            cats.reposteria += cant;
+          } else if (claveRapida === 'pasteleria') {
+            cats.pasteleria += cant;
+          } else if (nom.indexOf('empanada') >= 0) {
             cats.empanadas += cant;
           } else if (nom.indexOf('sopaipilla') >= 0) {
             cats.sopaipillas += cant;
