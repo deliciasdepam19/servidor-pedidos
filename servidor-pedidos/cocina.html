@@ -568,11 +568,14 @@
         amasados: 0, colizas: 0, hallullas: 0, dobladitas: 0, integrales: 0, hallullaGrande: 0,
         empanadas: 0, reposteria: 0, pasteleria: 0, sopaipillas: 0, otros: 0
       };
+      function sinTildes(s) {
+        return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      }
       for (var i = 0; i < pedidos.length; i++) {
         var items = pedidos[i].items || [];
         for (var j = 0; j < items.length; j++) {
-          var nom = (items[j].producto || '').toLowerCase();
-          var catItem = (items[j].categoria || '').toLowerCase();
+          var nom = sinTildes((items[j].producto || '').toLowerCase());
+          var catItem = sinTildes((items[j].categoria || '').toLowerCase());
           var cant = items[j].cantidad;
 
           if (nom.indexOf('empanada') >= 0) {
