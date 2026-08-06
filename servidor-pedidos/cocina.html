@@ -29,45 +29,58 @@
 
     /* TOP BAR */
     #topbar {
-      display: grid;
-      grid-template-columns: 1fr 2fr 1fr;
+      display: flex;
+      flex-wrap: nowrap;
       align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       padding: 3px 20px;
       border-bottom: 1px solid rgba(64, 206, 224, 0.12);
       background: rgba(9, 16, 15, 0.95);
       position: sticky;
       top: 0;
       z-index: 10;
+      overflow-x: auto;
     }
 
     .topbar-left {
       display: flex;
+      flex-wrap: nowrap;
       gap: 12px;
       align-items: center;
       justify-content: flex-start;
+      flex: 0 1 auto;
+      min-width: 0;
     }
 
     .topbar-center {
       display: flex;
+      flex-wrap: nowrap;
       justify-content: center;
       align-items: center;
       height: 100%;
+      flex: 1 1 auto;
+      min-width: 0;
     }
 
     .topbar-right {
       display: flex;
+      flex-wrap: nowrap;
       justify-content: flex-end;
       align-items: center;
       gap: 16px;
+      flex: 0 1 auto;
+      min-width: 0;
     }
 
     #brand {
       height: 100%;
       max-height: 75px;
       width: auto;
-      max-width: 600px;
+      max-width: 100%;
       display: block;
       object-fit: contain;
+      flex-shrink: 1;
     }
 
     .badge-top {
@@ -79,6 +92,8 @@
       font-family: 'Inter', sans-serif;
       font-size: 18px;
       font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .badge-top i {
@@ -512,7 +527,7 @@
         emptyEl.style.display = 'flex';
         grid.innerHTML = '';
         actualizarBadges(0, 0, 0, 0);
-        renderSidebarTotales(0, 0, 0, 0, 0, 0, 0, 0);
+        renderSidebarTotales(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         return;
       }
       emptyEl.style.display = 'none';
@@ -527,23 +542,53 @@
       actualizarBadges(w, l, a, pedidos.length);
 
       // ── Sidebar: solo actualizar counts ─────────────────────────────
-      var cats = { amasados: 0, colizas: 0, hallullas: 0, dobladitas: 0, integrales: 0, hallullaGrande: 0, empanadas: 0 };
+      var cats = {
+        amasados: 0, colizas: 0, hallullas: 0, dobladitas: 0, integrales: 0, hallullaGrande: 0,
+        empanadas: 0, reposteria: 0, pasteleria: 0, sopaipillas: 0, otros: 0
+      };
       for (var i = 0; i < pedidos.length; i++) {
         var items = pedidos[i].items || [];
         for (var j = 0; j < items.length; j++) {
           var nom = (items[j].producto || '').toLowerCase();
+          var catItem = (items[j].categoria || '').toLowerCase();
           var cant = items[j].cantidad;
-          if (nom.indexOf('empanada') >= 0) cats.empanadas += cant;
-          else if (nom.indexOf('integral') >= 0) cats.integrales += cant;
-          else if (nom.indexOf('amasado') >= 0) cats.amasados += cant;
-          else if (nom.indexOf('coliza') >= 0) cats.colizas += cant;
-          else if (nom.indexOf('hallulla grande') >= 0) cats.hallullaGrande += cant;
-          else if (nom.indexOf('hallulla') >= 0) cats.hallullas += cant;
-          else if (nom.indexOf('dobladita') >= 0) cats.dobladitas += cant;
+
+          if (nom.indexOf('empanada') >= 0 || catItem.indexOf('empanada') >= 0) {
+            cats.empanadas += cant;
+          } else if (nom.indexOf('sopaipilla') >= 0 || catItem.indexOf('sopaipilla') >= 0) {
+            cats.sopaipillas += cant;
+          } else if (nom.indexOf('integral') >= 0) {
+            cats.integrales += cant;
+          } else if (nom.indexOf('amasado') >= 0) {
+            cats.amasados += cant;
+          } else if (nom.indexOf('coliza') >= 0) {
+            cats.colizas += cant;
+          } else if (nom.indexOf('hallulla grande') >= 0) {
+            cats.hallullaGrande += cant;
+          } else if (nom.indexOf('hallulla') >= 0) {
+            cats.hallullas += cant;
+          } else if (nom.indexOf('dobladita') >= 0) {
+            cats.dobladitas += cant;
+          } else if (
+            catItem.indexOf('reposter') >= 0 ||
+            /kuchen|torta|queque|alfajor|brownie|tarta|cheesecake|milhoja|mousse|reposter/.test(nom)
+          ) {
+            cats.reposteria += cant;
+          } else if (
+            catItem.indexOf('pasteler') >= 0 ||
+            /pastel|berlin|suspiro|pie de limon|pie de manzana|pasteler/.test(nom)
+          ) {
+            cats.pasteleria += cant;
+          } else {
+            cats.otros += cant;
+          }
         }
       }
       var totalPan = cats.amasados + cats.colizas + cats.hallullas + cats.hallullaGrande + cats.dobladitas + cats.integrales;
-      renderSidebarTotales(cats.amasados, cats.colizas, cats.hallullas, cats.hallullaGrande, cats.dobladitas, cats.integrales, totalPan, cats.empanadas);
+      renderSidebarTotales(
+        cats.amasados, cats.colizas, cats.hallullas, cats.hallullaGrande, cats.dobladitas, cats.integrales,
+        totalPan, cats.empanadas, cats.reposteria, cats.pasteleria, cats.sopaipillas, cats.otros
+      );
 
       // ── Grid: diff inteligente — agrega, quita y ACTUALIZA cards ─────
       var idsActuales = new Set();
@@ -632,7 +677,7 @@
     }
 
     // ── Sidebar: solo actualizar counts por ID, nunca innerHTML ───────
-    function renderSidebarTotales(amasados, colizas, hallullas, hallullaGrande, dobladitas, integrales, totalPan, empanadas) {
+    function renderSidebarTotales(amasados, colizas, hallullas, hallullaGrande, dobladitas, integrales, totalPan, empanadas, reposteria, pasteleria, sopaipillas, otros) {
       var map = {
         'count-amasados': amasados,
         'count-colizas': colizas,
@@ -641,7 +686,11 @@
         'count-dobladitas': dobladitas,
         'count-integrales': integrales,
         'count-total-panaderia': totalPan,
-        'count-total-empanadas': empanadas
+        'count-total-empanadas': empanadas,
+        'count-total-reposteria': reposteria,
+        'count-total-pasteleria': pasteleria,
+        'count-total-sopaipillas': sopaipillas,
+        'count-total-otros': otros
       };
       for (var id in map) {
         var el = document.getElementById(id);
