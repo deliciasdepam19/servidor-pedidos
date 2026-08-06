@@ -680,10 +680,13 @@
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
     }
-    // Desbloquear AudioContext en el primer click del usuario
-    document.addEventListener('click', function desbloquear() {
-      ensureAudioCtx();
-      document.removeEventListener('click', desbloquear);
+    // Desbloquear AudioContext en la primera interacción del usuario
+    // (click cubre mouse; touchstart y keydown cubren pantallas táctiles / kiosko)
+    ['click', 'touchstart', 'keydown'].forEach(function (evt) {
+      document.addEventListener(evt, function desbloquear() {
+        ensureAudioCtx();
+        document.removeEventListener(evt, desbloquear);
+      });
     });
     function tocarTimbre() {
       try {
@@ -708,10 +711,12 @@
 
     // Detectar nuevos pedidos comparando con el estado anterior
     var ultimoSnapshot = '';
+    var snapshotInicializado = false;
     function hayPedidosNuevos(d) {
       var ids = (d.pedidos || []).map(function (p) { return p.numero; }).sort().join(',');
-      var esNuevo = ultimoSnapshot && ids !== ultimoSnapshot && (d.pedidos || []).length > 0;
+      var esNuevo = snapshotInicializado && ids !== ultimoSnapshot && (d.pedidos || []).length > 0;
       ultimoSnapshot = ids;
+      snapshotInicializado = true;
       return esNuevo;
     }
 
