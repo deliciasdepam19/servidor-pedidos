@@ -143,17 +143,52 @@ public class ProductoRapidoDAO {
     }
 
     public void limpiarDuplicados() {
-        String sql = "DELETE FROM productos_rapidos WHERE id NOT IN " +
-                "(SELECT MIN(id) FROM productos_rapidos GROUP BY LOWER(nombre))";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
+
+            // 1) Eliminar duplicados exactos (case-insensitive)
+            String sql = "DELETE FROM productos_rapidos WHERE id NOT IN " +
+                    "(SELECT MIN(id) FROM productos_rapidos GROUP BY LOWER(nombre))";
             PreparedStatement ps = conn.prepareStatement(sql);
             int eliminados = ps.executeUpdate();
             ps.close();
             if (eliminados > 0) {
-                System.out.println("PRODUCTOS_RAPIDOS: eliminados " + eliminados + " duplicados");
+                System.out.println("PRODUCTOS_RAPIDOS: eliminados " + eliminados + " duplicados exactos");
             }
+
+            // 2) Eliminar plurales sobrantes: normalizar nombre y comparar
+            String selectSql = "SELECT id, nombre FROM productos_rapidos ORDER BY id ASC";
+            ps = conn.prepareStatement(selectSql);
+            java.sql.ResultSet rs = ps.executeQuery();
+
+            java.util.Map<String, java.util.List<int[]>> grupos = new java.util.LinkedHashMap<>();
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String nombre = rs.getString("nombre");
+                String key = normalizarNombre(nombre);
+                grupos.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(new int[]{id});
+            }
+            rs.close();
+            ps.close();
+
+            String deleteSql = "DELETE FROM productos_rapidos WHERE id = ?";
+            ps = conn.prepareStatement(deleteSql);
+            int plurales = 0;
+            for (java.util.List<int[]> ids : grupos.values()) {
+                if (ids.size() > 1) {
+                    for (int i = 1; i < ids.size(); i++) {
+                        ps.setInt(1, ids.get(i)[0]);
+                        ps.executeUpdate();
+                        plurales++;
+                    }
+                }
+            }
+            ps.close();
+            if (plurales > 0) {
+                System.out.println("PRODUCTOS_RAPIDOS: eliminados " + plurales + " plurales sobrantes");
+            }
+
         } catch (SQLException e) {
             System.err.println("Error limpiando duplicados: " + e.getMessage());
         } finally {
@@ -161,5 +196,17 @@ public class ProductoRapidoDAO {
                 Conexion.devolver(conn);
             }
         }
+    }
+
+    private String normalizarNombre(String nombre) {
+        if (nombre == null) return "";
+        String n = nombre.trim().toLowerCase();
+        n = n.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
+        if (n.endsWith("es") && n.length() > 3) {
+            n = n.substring(0, n.length() - 2);
+        } else if (n.endsWith("s") && n.length() > 2) {
+            n = n.substring(0, n.length() - 1);
+        }
+        return n;
     }
 }
