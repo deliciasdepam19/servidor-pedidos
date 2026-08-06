@@ -507,6 +507,7 @@ public class PedidosServer {
                             .append("\",\"hora\":\"").append(obtenerHora(p.timestamp))
                             .append("\",\"origen\":\"").append(origen)
                             .append("\",\"estado\":\"").append(p.estado)
+                            .append("\",\"cats\":\"").append(escaparJson(p.categoriasDetalle != null ? p.categoriasDetalle : ""))
                             .append("\",\"items\":[");
                         for (int j = 0; j < items.size(); j++) {
                             ItemPedido it = items.get(j);
@@ -610,7 +611,8 @@ servidor.createContext("/img/", exchange -> {
                         Object[] p = productos.get(i);
                         json.append("{\"id\":").append(p[0])
                             .append(",\"nombre\":\"").append(escaparJson((String)p[1]))
-                            .append("\",\"precio\":").append(p[2]).append("}");
+                            .append("\",\"precio\":").append(p[2])
+                            .append(",\"categoria\":\"").append(escaparJson((String)p[3])).append("\"}");
                         if (i < productos.size() - 1) json.append(",");
                     }
                     json.append("]");

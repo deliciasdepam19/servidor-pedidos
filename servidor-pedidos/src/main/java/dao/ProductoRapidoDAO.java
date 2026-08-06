@@ -8,7 +8,7 @@ public class ProductoRapidoDAO {
 
     public List<Object[]> listar() {
         List<Object[]> lista = new ArrayList<>();
-        String sql = "SELECT id, nombre, precio FROM productos_rapidos ORDER BY id ASC";
+        String sql = "SELECT id, nombre, precio, COALESCE(categoria, 'Panadería') AS categoria FROM productos_rapidos ORDER BY id ASC";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
@@ -18,8 +18,8 @@ public class ProductoRapidoDAO {
                 int id = rs.getInt("id");
                 String nombre = rs.getString("nombre");
                 double precio = rs.getDouble("precio");
-                System.out.println("PROD: id=" + id + " nombre=" + nombre + " precio=" + precio);
-                lista.add(new Object[]{id, nombre, precio});
+                String categoria = rs.getString("categoria");
+                lista.add(new Object[]{id, nombre, precio, categoria});
             }
             rs.close();
             ps.close();
@@ -33,14 +33,15 @@ public class ProductoRapidoDAO {
         return lista;
     }
 
-    public boolean agregar(String nombre, double precio) {
-        String sql = "INSERT INTO productos_rapidos (nombre, precio) VALUES (?, ?)";
+    public boolean agregar(String nombre, double precio, String categoria) {
+        String sql = "INSERT INTO productos_rapidos (nombre, precio, categoria) VALUES (?, ?, ?)";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setString(1, nombre.trim());
             ps.setDouble(2, precio);
+            ps.setString(3, categoria != null ? categoria.trim() : "Panadería");
             ps.executeUpdate();
             ps.close();
             return true;
@@ -54,15 +55,16 @@ public class ProductoRapidoDAO {
         }
     }
 
-    public boolean actualizar(int id, String nombre, double precio) {
-        String sql = "UPDATE productos_rapidos SET nombre = ?, precio = ? WHERE id = ?";
+    public boolean actualizar(int id, String nombre, double precio, String categoria) {
+        String sql = "UPDATE productos_rapidos SET nombre = ?, precio = ?, categoria = ? WHERE id = ?";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setString(1, nombre.trim());
             ps.setDouble(2, precio);
-            ps.setInt(3, id);
+            ps.setString(3, categoria != null ? categoria.trim() : "Panadería");
+            ps.setInt(4, id);
             ps.executeUpdate();
             ps.close();
             return true;

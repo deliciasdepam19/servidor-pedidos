@@ -19,6 +19,7 @@ public class PedidosDAO {
         public String franja;
         public String timestamp;
         public String origen;
+        public String categoriasDetalle;
 
         public PedidoBD(int id, int numero, String cliente, String telefono,
                 String detalle, double total, String estado,
@@ -428,7 +429,8 @@ public class PedidosDAO {
         try {
             conn = Conexion.conectar();
             PreparedStatement ps = conn.prepareStatement(
-                    "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
+                    "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen, "
+                    + "categorias_detalle "
                     + "FROM pedidos "
                     + "WHERE (fecha_hora::timestamptz AT TIME ZONE 'America/Santiago')::date = "
                     + "    (CURRENT_TIMESTAMP AT TIME ZONE 'America/Santiago')::date "
@@ -443,6 +445,7 @@ public class PedidosDAO {
                         rs.getString("estado"), rs.getString("franja"),
                         rs.getString("fecha_hora"));
                 p.origen = rs.getString("origen");
+                p.categoriasDetalle = rs.getString("categorias_detalle");
                 pedidos.add(p);
             }
             rs.close();
