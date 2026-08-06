@@ -530,7 +530,7 @@
       var totalPan = cats.amasados + cats.colizas + cats.hallullas + cats.hallullaGrande + cats.dobladitas + cats.integrales;
       renderSidebarTotales(cats.amasados, cats.colizas, cats.hallullas, cats.hallullaGrande, cats.dobladitas, cats.integrales, totalPan, cats.empanadas);
 
-      // ── Grid: diff inteligente — solo agregar/quitar cards ──────────
+      // ── Grid: diff inteligente — agrega, quita y ACTUALIZA cards ─────
       var idsActuales = new Set();
       grid.querySelectorAll('.pedido-card').forEach(function (c) { idsActuales.add(c.dataset.pedidoId); });
       var idsNuevos = new Set(pedidos.map(function (p) { return p.numero; }));
@@ -546,10 +546,11 @@
         }
       });
 
-      // Agregar cards nuevas
+      // Agregar cards nuevas y ACTUALIZAR el contenido de las existentes
+      // (cantidad/ítems, cliente, hora o estado pueden cambiar sin que
+      // cambie el número de pedido, y antes esos cambios se ignoraban)
       for (var i = 0; i < pedidos.length; i++) {
         var p = pedidos[i];
-        if (idsActuales.has(p.numero)) continue; // Ya existe, no recrear
 
         var ec = p.estado === 'EN PROCESO' ? 'estado-proceso' : '';
         var esLocal = p.origen === 'LOCAL';
@@ -557,9 +558,14 @@
         var oc = esLocal ? 'origen-local' : (esApp ? 'origen-app' : 'origen-web');
         var oi = esLocal ? 'LOCAL' : (esApp ? 'APP' : 'WEB');
 
-        var card = document.createElement('div');
+        var card = grid.querySelector('[data-pedido-id="' + p.numero + '"]');
+        var esNueva = !card;
+        if (esNueva) {
+          card = document.createElement('div');
+          card.dataset.pedidoId = p.numero;
+        }
         card.className = 'pedido-card ' + ec;
-        card.dataset.pedidoId = p.numero;
+        card.innerHTML = ''; // reconstruir contenido interno por si cambió
 
         var topDiv = document.createElement('div');
         topDiv.className = 'card-top';
@@ -598,7 +604,7 @@
           card.appendChild(detDiv);
         }
 
-        grid.appendChild(card);
+        if (esNueva) grid.appendChild(card);
       }
     }
 
