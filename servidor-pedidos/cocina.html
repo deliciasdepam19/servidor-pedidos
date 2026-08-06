@@ -170,6 +170,11 @@
     }
 
     /* SIDEBAR */
+    .sidebar-group {
+      display: flex;
+      flex-direction: column;
+    }
+
     #sidebar h3 {
       font-family: 'Inter', sans-serif;
       font-size: 10px;
@@ -443,41 +448,53 @@
       <div id="pedidos-grid"></div>
     </div>
     <aside id="sidebar">
-      <h3>Panadería</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat"><span>Amasados</span><span class="count" id="count-amasados">0</span></div>
-        <div class="sidebar-cat"><span>Colizas</span><span class="count" id="count-colizas">0</span></div>
-        <div class="sidebar-cat"><span>Hallullas</span><span class="count" id="count-hallullas">0</span></div>
-        <div class="sidebar-cat"><span>Hallulla Grande</span><span class="count" id="count-hallulla-grande">0</span>
-        </div>
-        <div class="sidebar-cat"><span>Dobladitas</span><span class="count" id="count-dobladitas">0</span></div>
-        <div class="sidebar-cat"><span>Integrales</span><span class="count" id="count-integrales">0</span></div>
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total-panaderia">0</span>
-        </div>
-      </div>
-      <h3>Empanadas</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total-empanadas">0</span>
+      <div class="sidebar-group">
+        <h3>Panadería</h3>
+        <div id="sidebar-content">
+          <div class="sidebar-cat"><span>Amasados</span><span class="count" id="count-amasados">0</span></div>
+          <div class="sidebar-cat"><span>Colizas</span><span class="count" id="count-colizas">0</span></div>
+          <div class="sidebar-cat"><span>Hallullas</span><span class="count" id="count-hallullas">0</span></div>
+          <div class="sidebar-cat"><span>Hallulla Grande</span><span class="count" id="count-hallulla-grande">0</span>
+          </div>
+          <div class="sidebar-cat"><span>Dobladitas</span><span class="count" id="count-dobladitas">0</span></div>
+          <div class="sidebar-cat"><span>Integrales</span><span class="count" id="count-integrales">0</span></div>
+          <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total-panaderia">0</span>
+          </div>
         </div>
       </div>
-      <h3>Repostería</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count"
-            id="count-total-reposteria">0</span></div>
+      <div class="sidebar-group">
+        <h3>Empanadas</h3>
+        <div id="sidebar-content">
+          <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total-empanadas">0</span>
+          </div>
+        </div>
       </div>
-      <h3>Pastelería</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count"
-            id="count-total-pasteleria">0</span></div>
+      <div class="sidebar-group">
+        <h3>Repostería</h3>
+        <div id="sidebar-content">
+          <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count"
+              id="count-total-reposteria">0</span></div>
+        </div>
       </div>
-      <h3>Sopaipillas</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count"
-            id="count-total-sopaipillas">0</span></div>
+      <div class="sidebar-group">
+        <h3>Pastelería</h3>
+        <div id="sidebar-content">
+          <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count"
+              id="count-total-pasteleria">0</span></div>
+        </div>
       </div>
-      <h3>Otros</h3>
-      <div id="sidebar-content">
-        <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total-otros">0</span>
+      <div class="sidebar-group">
+        <h3>Sopaipillas</h3>
+        <div id="sidebar-content">
+          <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count"
+              id="count-total-sopaipillas">0</span></div>
+        </div>
+      </div>
+      <div class="sidebar-group">
+        <h3>Otros</h3>
+        <div id="sidebar-content">
+          <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count" id="count-total-otros">0</span>
+          </div>
         </div>
       </div>
     </aside>
