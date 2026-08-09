@@ -1,6 +1,5 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -17,7 +16,6 @@
       padding: 0;
       box-sizing: border-box;
     }
-
     body {
       font-family: 'Inter', sans-serif;
       background: #09100f;
@@ -26,7 +24,6 @@
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
-
     /* TOP BAR */
     #topbar {
       display: flex;
@@ -42,7 +39,6 @@
       z-index: 10;
       overflow-x: auto;
     }
-
     .topbar-left {
       display: flex;
       flex-wrap: nowrap;
@@ -52,7 +48,6 @@
       flex: 0 1 auto;
       min-width: 0;
     }
-
     .topbar-center {
       display: flex;
       flex-wrap: nowrap;
@@ -62,7 +57,6 @@
       flex: 1 1 auto;
       min-width: 0;
     }
-
     .topbar-right {
       display: flex;
       flex-wrap: nowrap;
@@ -72,7 +66,6 @@
       flex: 0 1 auto;
       min-width: 0;
     }
-
     #brand {
       height: 100%;
       max-height: 75px;
@@ -82,7 +75,6 @@
       object-fit: contain;
       flex-shrink: 1;
     }
-
     .badge-top {
       display: inline-flex;
       align-items: center;
@@ -95,30 +87,24 @@
       white-space: nowrap;
       flex-shrink: 0;
     }
-
     .badge-top i {
       font-size: 20px;
     }
-
     .badge-top .badge-count {
       opacity: 0.6;
     }
-
     .badge-top-web {
       background: rgba(64, 206, 224, 0.1);
       color: #40cee0;
     }
-
     .badge-top-local {
       background: rgba(130, 224, 170, 0.1);
       color: #82e0aa;
     }
-
     .badge-top-app {
       background: rgba(180, 130, 255, 0.1);
       color: #c7a6ff;
     }
-
     #badge-sonido {
       width: 44px;
       height: 44px;
@@ -131,12 +117,10 @@
       font-size: 20px;
       cursor: pointer;
     }
-
     #badge-sonido.muted {
       background: rgba(255, 255, 255, 0.05);
       color: #6a8f96;
     }
-
     #reloj {
       font-family: 'Inter', sans-serif;
       font-size: 42px;
@@ -144,20 +128,17 @@
       font-variant-numeric: tabular-nums;
       color: #40cee0;
     }
-
     /* MAIN LAYOUT */
     #cuerpo {
       display: flex;
       height: calc(100vh - 60px);
       overflow: hidden;
     }
-
     #pedidos-area {
       flex: 1;
       padding: 16px;
       overflow: hidden;
     }
-
     #sidebar {
       width: 240px;
       background: #101a1c;
@@ -168,18 +149,15 @@
       flex-direction: column;
       justify-content: flex-start;
     }
-
     /* SIDEBAR */
     .sidebar-group {
       display: flex;
       flex-direction: column;
       margin-bottom: 14px;
     }
-
     .sidebar-group:last-child {
       margin-bottom: 0;
     }
-
     #sidebar h3 {
       font-family: 'Inter', sans-serif;
       font-size: 12px;
@@ -189,7 +167,6 @@
       letter-spacing: 1.5px;
       text-align: center;
     }
-
     #total-pedidos-card {
       background: rgba(255, 180, 100, 0.08);
       border: 1px solid rgba(255, 180, 100, 0.15);
@@ -198,7 +175,6 @@
       margin-right: 48px;
       text-align: center;
     }
-
     #total-pedidos-card p {
       font-size: 10px;
       color: #ffb464;
@@ -206,13 +182,11 @@
       letter-spacing: 1px;
       margin: 0 0 2px;
     }
-
     #total-pedidos-card span {
       font-size: 22px;
       font-weight: 500;
       color: #ffb464;
     }
-
     .sidebar-cat {
       display: flex;
       justify-content: space-between;
@@ -228,7 +202,6 @@
       border: 1px solid rgba(64, 206, 224, 0.08);
       color: #c0d6d8;
     }
-
     .sidebar-cat .count {
       font-size: 19px;
       font-weight: 800;
@@ -236,7 +209,6 @@
       min-width: 28px;
       text-align: right;
     }
-
     .sidebar-total {
       margin-top: 3px;
       border-top: 2px solid rgba(255, 180, 100, 0.3);
@@ -244,11 +216,9 @@
       font-weight: 700;
       margin-bottom: 6px;
     }
-
     .sidebar-total .count {
       color: #ffb464;
     }
-
     /* GRID */
     #pedidos-grid {
       column-count: 4;
@@ -256,7 +226,6 @@
       column-fill: auto;
       overflow: hidden;
     }
-
     #sin-conexion {
       display: none;
       background: rgba(255, 136, 136, 0.12);
@@ -268,7 +237,6 @@
       text-align: center;
       border: 1px solid rgba(255, 136, 136, 0.2);
     }
-
     #empty-state {
       display: none;
       flex-direction: column;
@@ -279,22 +247,18 @@
       font-size: 26px;
       font-family: 'Inter', sans-serif;
     }
-
     #empty-state img {
       max-width: 260px;
       width: 60%;
       height: auto;
       display: block;
     }
-
     #empty-logo-delipan {
       margin-bottom: -6px;
     }
-
     #empty-logo-delicias {
       margin-bottom: 4px;
     }
-
     /* PEDIDO CARD */
     .pedido-card {
       background: #101a1c;
@@ -308,22 +272,18 @@
       display: inline-block;
       width: 100%;
     }
-
     .pedido-card.estado-proceso {
       border-left-color: #ff8800;
     }
-
     .pedido-card.removing {
       opacity: 0;
     }
-
     .card-top {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 10px;
     }
-
     .pedido-numero {
       font-family: 'Inter', sans-serif;
       font-size: 28px;
@@ -331,7 +291,6 @@
       color: #e0eff1;
       letter-spacing: -0.5px;
     }
-
     .origen-badge {
       display: inline-block;
       padding: 4px 12px;
@@ -340,25 +299,21 @@
       font-size: 11px;
       font-weight: 600;
     }
-
     .origen-web {
       background: rgba(64, 206, 224, 0.12);
       color: #40cee0;
       border: 1px solid rgba(64, 206, 224, 0.2);
     }
-
     .origen-app {
       background: rgba(180, 130, 255, 0.12);
       color: #c7a6ff;
       border: 1px solid rgba(180, 130, 255, 0.25);
     }
-
     .origen-local {
       background: rgba(130, 224, 170, 0.1);
       color: #82e0aa;
       border: 1px solid rgba(130, 224, 170, 0.2);
     }
-
     .card-cliente {
       font-family: 'Playfair Display', serif;
       font-size: 15px;
@@ -366,55 +321,45 @@
       color: #40cee0;
       margin-bottom: 3px;
     }
-
     .card-hora {
       font-size: 12px;
       color: #6a8f96;
       margin-bottom: 8px;
     }
-
     .card-detalle {
       font-size: 17px;
       color: #e0eff1;
       line-height: 1.5;
       font-weight: 500;
     }
-
     /* RESPONSIVE */
     @media(max-width:900px) {
       #cuerpo {
         flex-direction: column-reverse;
       }
-
       #sidebar {
         width: 100%;
         border-left: none;
         border-top: 1px solid rgba(64, 206, 224, 0.1);
         padding: 16px;
       }
-
       #pedidos-grid {
         column-count: 1;
       }
-
       #reloj {
         font-size: 28px;
       }
-
       .badge-top {
         font-size: 15px;
         padding: 8px 14px;
       }
-
       .badge-top i {
         font-size: 16px;
       }
     }
   </style>
 </head>
-
 <body>
-
   <div id="topbar">
     <div class="topbar-left">
       <span class="badge-top badge-top-web" id="badge-web"><i class="ti ti-world" aria-hidden="true"></i>WEB <span
@@ -424,26 +369,22 @@
       <span class="badge-top badge-top-app" id="badge-app"><i class="ti ti-device-mobile" aria-hidden="true"></i>APP
         <span class="badge-count">0</span></span>
     </div>
-
     <div class="topbar-center">
       <img id="brand" src="/img/delicias.png" alt="Logo">
     </div>
-
     <div id="total-pedidos-card">
       <p>Total pedidos</p>
       <span id="sidebar-total-pedidos">0</span>
     </div>
-
     <div class="topbar-right">
       <div id="reloj">--:--</div>
       <div id="badge-sonido" role="img" aria-label="Sonido de notificaciones activado"><i class="ti ti-volume"
           aria-hidden="true"></i></div>
     </div>
   </div>
-
   <div id="cuerpo">
     <div id="pedidos-area">
-      <div id="sin-conexion">Sin conexiÃ³n</div>
+      <div id="sin-conexion">Sin conexión</div>
       <div id="empty-state">
         <img id="empty-logo-delipan"
           src="/img/logo-delipan.png"
@@ -457,7 +398,7 @@
     </div>
     <aside id="sidebar">
       <div class="sidebar-group">
-        <h3>PanaderÃ­a</h3>
+        <h3>Panadería</h3>
         <div id="sidebar-content">
           <div class="sidebar-cat"><span>Amasados</span><span class="count" id="count-amasados">0</span></div>
           <div class="sidebar-cat"><span>Colizas</span><span class="count" id="count-colizas">0</span></div>
@@ -480,14 +421,14 @@
         </div>
       </div>
       <div class="sidebar-group">
-        <h3>ReposterÃ­a</h3>
+        <h3>Repostería</h3>
         <div id="sidebar-content">
           <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count"
               id="count-total-reposteria">0</span></div>
         </div>
       </div>
       <div class="sidebar-group">
-        <h3>PastelerÃ­a</h3>
+        <h3>Pastelería</h3>
         <div id="sidebar-content">
           <div class="sidebar-cat sidebar-total"><span>Total</span><span class="count"
               id="count-total-pasteleria">0</span></div>
@@ -509,13 +450,11 @@
       </div>
     </aside>
   </div>
-
   <script>
     const API_KEY = '__API_KEY__';
     const POLL_MS = 5000;
     const MOCK = false;
     var ultimosDatos = null;
-
     function actualizarReloj() {
       var a = new Date();
       document.getElementById('reloj').textContent =
@@ -523,7 +462,6 @@
     }
     actualizarReloj();
     setInterval(actualizarReloj, 30000);
-
     async function cargarPedidos() {
       if (MOCK) {
         renderizar(mockData());
@@ -538,14 +476,12 @@
         renderizar(d);
       } catch (e) {
         document.getElementById('sin-conexion').style.display = 'block';
-        // No limpiar sidebar en error â€” mantener Ãºltimos datos conocidos
+        // No limpiar sidebar en error ?? mantener últimos datos conocidos
       }
     }
-
     function renderizar(d) {
       var pedidos = d.pedidos || [];
-
-      // â”€â”€ Empty state: solo show/hide, nunca reconstruir â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // -- Empty state: solo show/hide, nunca reconstruir ????????????????????????????
       var emptyEl = document.getElementById('empty-state');
       var grid = document.getElementById('pedidos-grid');
       if (pedidos.length === 0) {
@@ -556,8 +492,7 @@
         return;
       }
       emptyEl.style.display = 'none';
-
-      // â”€â”€ Badges: solo actualizar texto, nunca innerHTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // -- Badges: solo actualizar texto, nunca innerHTML ????????????????????????????
       var w = 0, l = 0, a = 0;
       for (var i = 0; i < pedidos.length; i++) {
         if (pedidos[i].origen === 'LOCAL') l++;
@@ -565,8 +500,7 @@
         else w++;
       }
       actualizarBadges(w, l, a, pedidos.length);
-
-      // â”€â”€ Sidebar: solo actualizar counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // -- Sidebar: solo actualizar counts ??????????????????????????????????????????????????????????
       var cats = {
         amasados: 0, colizas: 0, hallullas: 0, dobladitas: 0, integrales: 0, hallullaGrande: 0,
         empanadas: 0, reposteria: 0, pasteleria: 0, sopaipillas: 0, otros: 0
@@ -574,8 +508,8 @@
       function sinTildes(s) {
         return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       }
-      // Mapa explÃ­cito de productos rÃ¡pidos (nombre â†’ categorÃ­a), segÃºn catÃ¡logo real.
-      // Se revisa en orden: las claves mÃ¡s especÃ­ficas van primero para no
+      // Mapa explícito de productos rápidos (nombre ?? categoría), según catálogo real.
+      // Se revisa en orden: las claves más específicas van primero para no
       // confundir "paleta grande" con "paleta", etc.
       var productosRapidos = [
         ['papas fritas chicas', 'otros'],
@@ -611,7 +545,6 @@
               break;
             }
           }
-
           if (claveRapida === 'otros') {
             cats.otros += cant;
           } else if (claveRapida === 'reposteria') {
@@ -652,12 +585,10 @@
         cats.amasados, cats.colizas, cats.hallullas, cats.hallullaGrande, cats.dobladitas, cats.integrales,
         totalPan, cats.empanadas, cats.reposteria, cats.pasteleria, cats.sopaipillas, cats.otros
       );
-
-      // â”€â”€ Grid: diff inteligente â€” agrega, quita y ACTUALIZA cards â”€â”€â”€â”€â”€
+      // -- Grid: diff inteligente ?? agrega, quita y ACTUALIZA cards ??????????
       var idsActuales = new Set();
       grid.querySelectorAll('.pedido-card').forEach(function (c) { idsActuales.add(c.dataset.pedidoId); });
       var idsNuevos = new Set(pedidos.map(function (p) { return p.numero; }));
-
       // Quitar cards que ya no existen
       idsActuales.forEach(function (id) {
         if (!idsNuevos.has(id)) {
@@ -668,19 +599,16 @@
           }
         }
       });
-
       // Agregar cards nuevas y ACTUALIZAR el contenido de las existentes
-      // (cantidad/Ã­tems, cliente, hora o estado pueden cambiar sin que
-      // cambie el nÃºmero de pedido, y antes esos cambios se ignoraban)
+      // (cantidad/ítems, cliente, hora o estado pueden cambiar sin que
+      // cambie el número de pedido, y antes esos cambios se ignoraban)
       for (var i = 0; i < pedidos.length; i++) {
         var p = pedidos[i];
-
         var ec = p.estado === 'EN PROCESO' ? 'estado-proceso' : '';
         var esLocal = p.origen === 'LOCAL';
         var esApp = p.origen === 'APP';
         var oc = esLocal ? 'origen-local' : (esApp ? 'origen-app' : 'origen-web');
         var oi = esLocal ? 'LOCAL' : (esApp ? 'APP' : 'WEB');
-
         var card = grid.querySelector('[data-pedido-id="' + p.numero + '"]');
         var esNueva = !card;
         if (esNueva) {
@@ -688,8 +616,7 @@
           card.dataset.pedidoId = p.numero;
         }
         card.className = 'pedido-card ' + ec;
-        card.innerHTML = ''; // reconstruir contenido interno por si cambiÃ³
-
+        card.innerHTML = ''; // reconstruir contenido interno por si cambió
         var topDiv = document.createElement('div');
         topDiv.className = 'card-top';
         var numSpan = document.createElement('span');
@@ -700,19 +627,15 @@
         badgeSpan.textContent = oi;
         topDiv.appendChild(numSpan);
         topDiv.appendChild(badgeSpan);
-
         var clienteDiv = document.createElement('div');
         clienteDiv.className = 'card-cliente';
         clienteDiv.textContent = p.cliente;
-
         var horaDiv = document.createElement('div');
         horaDiv.className = 'card-hora';
         horaDiv.textContent = p.hora;
-
         card.appendChild(topDiv);
         card.appendChild(clienteDiv);
         card.appendChild(horaDiv);
-
         for (var j = 0; j < p.items.length; j++) {
           var it = p.items[j];
           var nom = (it.producto || '')
@@ -722,7 +645,6 @@
             .replace(/\s*:\s*\d+\s*uds\.?$/i, '')
             .replace(/\s*uds\.?$/i, '')
             .trim();
-
           // Extraer opciones (-Mechada, Jamon, Tomate) del nombre
           var opciones = '';
           var armaMatch = nom.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
@@ -736,35 +658,30 @@
               .filter(function(o) { return o.length > 0; })
               .join(', ');
           }
-
           if (nom.length > 80) nom = nom.substring(0, 80) + '...';
           var detDiv = document.createElement('div');
           detDiv.className = 'card-detalle';
           detDiv.textContent = it.cantidad + ' ' + nom;
           card.appendChild(detDiv);
-
           if (opciones) {
             var optDiv = document.createElement('div');
             optDiv.className = 'card-detalle';
-            optDiv.style.cssText = 'font-size:11px;color:#888;padding-left:12px;margin-top:-2px;';
-            optDiv.textContent = 'â”” ' + opciones;
+            optDiv.style.cssText = 'font-size:17px;color:#aab;padding-left:12px;margin-top:2px;';
+            optDiv.textContent = '\u2514 ' + opciones;
             card.appendChild(optDiv);
           }
         }
-
         if (esNueva) grid.appendChild(card);
       }
     }
-
-    // â”€â”€ Badges: solo actualizar textContent, nunca reconstruir â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Badges: solo actualizar textContent, nunca reconstruir ????????????????
     function actualizarBadges(web, local, app, total) {
       document.querySelector('#badge-web .badge-count').textContent = web;
       document.querySelector('#badge-local .badge-count').textContent = local;
       document.querySelector('#badge-app .badge-count').textContent = app;
       document.getElementById('sidebar-total-pedidos').textContent = total;
     }
-
-    // â”€â”€ Sidebar: solo actualizar counts por ID, nunca innerHTML â”€â”€â”€â”€â”€â”€â”€
+    // -- Sidebar: solo actualizar counts por ID, nunca innerHTML ??????????????
     function renderSidebarTotales(amasados, colizas, hallullas, hallullaGrande, dobladitas, integrales, totalPan, empanadas, reposteria, pasteleria, sopaipillas, otros) {
       var map = {
         'count-amasados': amasados,
@@ -785,45 +702,43 @@
         if (el) el.textContent = map[id];
       }
     }
-
     function eh(s) {
       if (!s) return '';
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-
     function mockData() {
       return {
         pedidos: [
           {
-            numero: '#W042', cliente: 'MarÃ­a GarcÃ­a', telefono: '+56912345678', hora: '19:15', origen: 'WEB', estado: 'PENDIENTE', items: [
+            numero: '#W042', cliente: 'María García', telefono: '+56912345678', hora: '19:15', origen: 'WEB', estado: 'PENDIENTE', items: [
               { producto: '3 docenas empanadas de carne', cantidad: 3, categoria: 'Empanada' },
               { producto: '2 churros normales', cantidad: 2, categoria: 'Churro' }
             ]
           },
           {
             numero: '#L018', cliente: 'Pedro Soto', telefono: '+56987654321', hora: '19:22', origen: 'APP', estado: 'PENDIENTE', items: [
-              { producto: '5 amasados', cantidad: 5, categoria: 'PanaderÃ­a' },
-              { producto: '3 hallullas', cantidad: 3, categoria: 'PanaderÃ­a' },
-              { producto: '2 colizas', cantidad: 2, categoria: 'PanaderÃ­a' }
+              { producto: '5 amasados', cantidad: 5, categoria: 'Panadería' },
+              { producto: '3 hallullas', cantidad: 3, categoria: 'Panadería' },
+              { producto: '2 colizas', cantidad: 2, categoria: 'Panadería' }
             ]
           },
           {
-            numero: '#W043', cliente: 'Ana LÃ³pez', telefono: '+56911223344', hora: '19:28', origen: 'WEB', estado: 'PENDIENTE', items: [
-              { producto: '4 dobladitas', cantidad: 4, categoria: 'PanaderÃ­a' },
-              { producto: '2 hallulla grande', cantidad: 2, categoria: 'PanaderÃ­a' },
-              { producto: '3 integrales', cantidad: 3, categoria: 'PanaderÃ­a' }
+            numero: '#W043', cliente: 'Ana López', telefono: '+56911223344', hora: '19:28', origen: 'WEB', estado: 'PENDIENTE', items: [
+              { producto: '4 dobladitas', cantidad: 4, categoria: 'Panadería' },
+              { producto: '2 hallulla grande', cantidad: 2, categoria: 'Panadería' },
+              { producto: '3 integrales', cantidad: 3, categoria: 'Panadería' }
             ]
           },
           {
-            numero: '#L019', cliente: 'Carlos MuÃ±oz', telefono: '+56955443322', hora: '19:31', origen: 'APP', estado: 'PENDIENTE', items: [
-              { producto: '6 amasados', cantidad: 6, categoria: 'PanaderÃ­a' },
+            numero: '#L019', cliente: 'Carlos Muñoz', telefono: '+56955443322', hora: '19:31', origen: 'APP', estado: 'PENDIENTE', items: [
+              { producto: '6 amasados', cantidad: 6, categoria: 'Panadería' },
               { producto: '1 sopaipilla', cantidad: 1, categoria: 'Sopaipilla' }
             ]
           },
           {
             numero: '#W044', cliente: 'Josefa Rojas', telefono: '+56966778899', hora: '19:35', origen: 'WEB', estado: 'PENDIENTE', items: [
-              { producto: '2 hallulla grande', cantidad: 2, categoria: 'PanaderÃ­a' },
-              { producto: '4 dobladitas', cantidad: 4, categoria: 'PanaderÃ­a' },
+              { producto: '2 hallulla grande', cantidad: 2, categoria: 'Panadería' },
+              { producto: '4 dobladitas', cantidad: 4, categoria: 'Panadería' },
               { producto: '1 docena empanadas pino', cantidad: 1, categoria: 'Empanada' }
             ]
           }
@@ -831,15 +746,14 @@
         totales: {}
       };
     }
-
-    // â”€â”€ Sonido de notificaciÃ³n (timbre tipo doorbell) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Sonido de notificación (timbre tipo doorbell) ????????????????????????????????????????????
     var audioCtx = null;
     function ensureAudioCtx() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
     }
-    // Desbloquear AudioContext en la primera interacciÃ³n del usuario
-    // (click cubre mouse; touchstart y keydown cubren pantallas tÃ¡ctiles / kiosko)
+    // Desbloquear AudioContext en la primera interacción del usuario
+    // (click cubre mouse; touchstart y keydown cubren pantallas táctiles / kiosko)
     ['click', 'touchstart', 'keydown'].forEach(function (evt) {
       document.addEventListener(evt, function desbloquear() {
         ensureAudioCtx();
@@ -866,7 +780,6 @@
         });
       } catch (e) { }
     }
-
     // Detectar nuevos pedidos comparando con el estado anterior
     var ultimoSnapshot = '';
     var snapshotInicializado = false;
@@ -877,8 +790,7 @@
       snapshotInicializado = true;
       return esNuevo;
     }
-
-    // â”€â”€ Wrapper de cargarPedidos con sonido â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Wrapper de cargarPedidos con sonido ????????????????????????????????????????????????????????????????
     var cargarPedidosOriginal = cargarPedidos;
     cargarPedidos = async function () {
       await cargarPedidosOriginal();
@@ -886,10 +798,8 @@
         tocarTimbre();
       }
     };
-
     cargarPedidos();
     setInterval(cargarPedidos, POLL_MS);
   </script>
 </body>
-
 </html>
