@@ -720,11 +720,34 @@
             .replace(/\s*:\s*\d+\s*uds\.?$/i, '')
             .replace(/\s*uds\.?$/i, '')
             .trim();
+
+          // Extraer opciones (-Mechada, Jamon, Tomate) del nombre
+          var opciones = '';
+          var armaMatch = nom.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+          if (armaMatch) {
+            nom = armaMatch[1].trim();
+            // Limpiar guiones iniciales y cantidades, dejar solo nombres
+            opciones = armaMatch[2]
+              .replace(/^-\s*/, '')
+              .split(/\s*,\s*/)
+              .map(function(o) { return o.replace(/^\d+\s*/, '').trim(); })
+              .filter(function(o) { return o.length > 0; })
+              .join(', ');
+          }
+
           if (nom.length > 80) nom = nom.substring(0, 80) + '...';
           var detDiv = document.createElement('div');
           detDiv.className = 'card-detalle';
           detDiv.textContent = it.cantidad + ' ' + nom;
           card.appendChild(detDiv);
+
+          if (opciones) {
+            var optDiv = document.createElement('div');
+            optDiv.className = 'card-detalle';
+            optDiv.style.cssText = 'font-size:11px;color:#888;padding-left:12px;margin-top:-2px;';
+            optDiv.textContent = '└ ' + opciones;
+            card.appendChild(optDiv);
+          }
         }
 
         if (esNueva) grid.appendChild(card);
