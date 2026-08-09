@@ -223,7 +223,6 @@
     #pedidos-grid {
       column-count: 4;
       column-gap: 10px;
-      column-fill: auto;
       overflow: hidden;
     }
     #sin-conexion {
@@ -746,25 +745,35 @@
         totales: {}
       };
     }
-    // -- Sonido de notificación (timbre tipo doorbell) ????????????????????????????????????????????
+    // -- Sonido de notificación (timbre tipo doorbell)
     var audioCtx = null;
+    var audioDesbloqueado = false;
     function ensureAudioCtx() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(function() {
+          audioDesbloqueado = true;
+        });
+      }
+      if (audioCtx.state === 'running') audioDesbloqueado = true;
     }
     // Desbloquear AudioContext en la primera interacción del usuario
-    // (click cubre mouse; touchstart y keydown cubren pantallas táctiles / kiosko)
-    ['click', 'touchstart', 'keydown'].forEach(function (evt) {
-      document.addEventListener(evt, function desbloquear() {
-        ensureAudioCtx();
-        document.removeEventListener(evt, desbloquear);
-      });
+    function desbloquearAudio() {
+      ensureAudioCtx();
+    }
+    ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(function (evt) {
+      document.addEventListener(evt, desbloquearAudio, { once: true });
     });
     function tocarTimbre() {
       try {
         ensureAudioCtx();
+        if (!audioCtx || audioCtx.state !== 'running') {
+          console.log('[SONIDO] AudioContext no listo, estado:', audioCtx ? audioCtx.state : 'null');
+          return;
+        }
         var ahora = audioCtx.currentTime;
-        // Dos tonos: ding-dong
         [0, 0.18].forEach(function (offset, i) {
           var freq = i === 0 ? 800 : 640;
           var osc = audioCtx.createOscillator();
@@ -778,7 +787,10 @@
           osc.start(ahora + offset);
           osc.stop(ahora + offset + 0.3);
         });
-      } catch (e) { }
+        console.log('[SONIDO] Timbre reproduciéndose');
+      } catch (e) {
+        console.log('[SONIDO] Error:', e);
+      }
     }
     // Detectar nuevos pedidos comparando con el estado anterior
     var ultimoSnapshot = '';
@@ -790,11 +802,12 @@
       snapshotInicializado = true;
       return esNuevo;
     }
-    // -- Wrapper de cargarPedidos con sonido ????????????????????????????????????????????????????????????????
+    // -- Wrapper de cargarPedidos con sonido
     var cargarPedidosOriginal = cargarPedidos;
     cargarPedidos = async function () {
       await cargarPedidosOriginal();
       if (ultimosDatos && hayPedidosNuevos(ultimosDatos)) {
+        console.log('[SONIDO] Pedido nuevo detectado, reproduciendo timbre');
         tocarTimbre();
       }
     };
