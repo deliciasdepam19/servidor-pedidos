@@ -81,6 +81,7 @@ public class PedidosServer {
 
         String nombre;
         String categoria;
+        String detalle;
         int cantidad;
     }
 
@@ -903,6 +904,7 @@ servidor.createContext("/img/", exchange -> {
                 ItemCarrito item = new ItemCarrito();
                 item.nombre = extraerValor(obj, "nombre");
                 item.categoria = extraerValor(obj, "categoria");
+                item.detalle = extraerValor(obj, "detalle");
                 item.cantidad = (int) extraerDouble(obj, "cantidad");
                 if (item.nombre != null && !item.nombre.equals("-") && item.cantidad > 0) {
                     lista.add(item);
@@ -1199,7 +1201,10 @@ servidor.createContext("/img/", exchange -> {
             String nombreCompleto = prefijo.isBlank()
                     ? item.nombre
                     : prefijo + " " + item.nombre;
-            sb.append(nombreCompleto).append(": ").append(item.cantidad).append(" uds.");
+            sb.append(item.cantidad).append("x ").append(nombreCompleto);
+            if (item.detalle != null && !item.detalle.isBlank() && !item.detalle.equals("-")) {
+                sb.append(" (-").append(item.detalle).append(")");
+            }
         }
         return sb.toString();
     }
