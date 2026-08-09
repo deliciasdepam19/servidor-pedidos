@@ -716,6 +716,7 @@
         for (var j = 0; j < p.items.length; j++) {
           var it = p.items[j];
           var nom = (it.producto || '')
+            .replace(/^\d+\s*x\s*/i, '')
             .replace(/^\d+\s*(docenas?\s*)?/i, '')
             .replace(/\s*:\s*\d+\s*uds\.?$/i, '')
             .replace(/\s*uds\.?$/i, '')
