@@ -221,9 +221,12 @@
     }
     /* GRID */
     #pedidos-grid {
-      column-count: 4;
-      column-gap: 10px;
-      overflow: hidden;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-auto-flow: row;
+      grid-template-rows: auto;
+      gap: 10px;
+      align-items: start;
     }
     #sin-conexion {
       display: none;
@@ -266,10 +269,7 @@
       border: 1px solid rgba(64, 206, 224, 0.12);
       border-left: 4px solid #40cee0;
       transition: opacity 0.5s ease;
-      break-inside: avoid;
-      margin-bottom: 10px;
-      display: inline-block;
-      width: 100%;
+      margin-bottom: 0;
     }
     .pedido-card.estado-proceso {
       border-left-color: #ff8800;
@@ -343,7 +343,8 @@
         padding: 16px;
       }
       #pedidos-grid {
-        column-count: 1;
+        grid-template-columns: 1fr;
+        grid-auto-flow: row;
       }
       #reloj {
         font-size: 28px;
@@ -589,12 +590,14 @@
       grid.querySelectorAll('.pedido-card').forEach(function (c) { idsActuales.add(c.dataset.pedidoId); });
       var idsNuevos = new Set(pedidos.map(function (p) { return p.numero; }));
       // Quitar cards que ya no existen
+      var huboEliminaciones = false;
       idsActuales.forEach(function (id) {
         if (!idsNuevos.has(id)) {
           var card = grid.querySelector('[data-pedido-id="' + id + '"]');
           if (card) {
+            huboEliminaciones = true;
             card.classList.add('removing');
-            setTimeout(function () { card.remove(); }, 500);
+            setTimeout(function () { card.remove(); distribuirCardsPorColumnas(); }, 500);
           }
         }
       });
@@ -672,6 +675,49 @@
         }
         if (esNueva) grid.appendChild(card);
       }
+      // Distribuir cards por columnas (llenar columna 1, luego 2, etc.)
+      distribuirCardsPorColumnas();
+    }
+
+    function distribuirCardsPorColumnas() {
+      var grid = document.getElementById('pedidos-grid');
+      var cards = grid.querySelectorAll('.pedido-card');
+      if (cards.length === 0) return;
+
+      // Calcular número de columnas según ancho de pantalla
+      var gridWidth = grid.offsetWidth;
+      var cardWidth = 260; // ancho mínimo de cada card
+      var numCols = Math.max(1, Math.min(4, Math.floor(gridWidth / (cardWidth + 10))));
+
+      // Obtener orden actual (excluir cards con animación de salida)
+      var cardsArr = [];
+      cards.forEach(function(c) {
+        if (!c.classList.contains('removing')) cardsArr.push(c);
+      });
+
+      // Calcular filas y distribuir
+      var numRows = Math.ceil(cardsArr.length / numCols);
+      if (numRows === 0) numRows = 1;
+
+      // Crear array de columnas vacías
+      var columnas = [];
+      for (var col = 0; col < numCols; col++) columnas.push([]);
+
+      // Distribuir cards por columnas (llena por fila primero para equilibrar)
+      for (var i = 0; i < cardsArr.length; i++) {
+        var colIdx = i % numCols;
+        columnas[colIdx].push(cardsArr[i]);
+      }
+
+      // Reordenar en el DOM: columna 0 primero, luego columna 1, etc.
+      grid.style.display = 'none';
+      grid.innerHTML = '';
+      for (var col = 0; col < numCols; col++) {
+        for (var j = 0; j < columnas[col].length; j++) {
+          grid.appendChild(columnas[col][j]);
+        }
+      }
+      grid.style.display = '';
     }
     // -- Badges: solo actualizar textContent, nunca reconstruir ????????????????
     function actualizarBadges(web, local, app, total) {
@@ -813,6 +859,12 @@
     };
     cargarPedidos();
     setInterval(cargarPedidos, POLL_MS);
+    // Redistribuir cards al cambiar tamaño de ventana (con debounce)
+    var resizeTimer;
+    window.addEventListener('resize', function() {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(distribuirCardsPorColumnas, 150);
+    });
   </script>
 </body>
 </html>
