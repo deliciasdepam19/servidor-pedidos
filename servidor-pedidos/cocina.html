@@ -221,11 +221,8 @@
     }
     /* GRID */
     #pedidos-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      grid-auto-rows: max-content;
-      gap: 10px;
-      align-items: start;
+      column-count: 4;
+      column-gap: 10px;
     }
     #sin-conexion {
       display: none;
@@ -268,7 +265,8 @@
       border: 1px solid rgba(64, 206, 224, 0.12);
       border-left: 4px solid #40cee0;
       transition: opacity 0.5s ease;
-      margin-bottom: 0;
+      break-inside: avoid;
+      margin-bottom: 10px;
     }
     .pedido-card.estado-proceso {
       border-left-color: #ff8800;
@@ -342,8 +340,7 @@
         padding: 16px;
       }
       #pedidos-grid {
-        grid-template-columns: 1fr;
-        grid-auto-flow: row;
+        column-count: 1;
       }
       #reloj {
         font-size: 28px;
