@@ -1119,7 +1119,7 @@ servidor.createContext("/img/", exchange -> {
         if (detalle.contains(" | ")) {
             segmentos = detalle.split(" \\| ");
         } else {
-            segmentos = detalle.split(",");
+            segmentos = splitRespetandoParentesis(detalle);
         }
 
         for (String seg : segmentos) {
@@ -1149,6 +1149,30 @@ servidor.createContext("/img/", exchange -> {
             items.add(new ItemPedido(texto, cantidad, cat));
         }
         return items;
+    }
+
+    /**
+     * Splittea por coma pero respeta contenido dentro de paréntesis.
+     * Ejemplo: "1x Arma tu Empanada (-Camarón, Jamón, Tomate)" → ["1x Arma tu Empanada (-Camarón, Jamón, Tomate)"]
+     * Ejemplo: "Empanada: 2 uds. | Pan: 1 uds." → ["Empanada: 2 uds.", "Pan: 1 uds."] (pipe siempre separa)
+     */
+    static String[] splitRespetandoParentesis(String detalle) {
+        List<String> partes = new ArrayList<>();
+        int nivel = 0;
+        int inicio = 0;
+        for (int i = 0; i < detalle.length(); i++) {
+            char c = detalle.charAt(i);
+            if (c == '(') nivel++;
+            else if (c == ')') nivel = Math.max(0, nivel - 1);
+            else if (c == ',' && nivel == 0) {
+                String seg = detalle.substring(inicio, i).trim();
+                if (!seg.isEmpty()) partes.add(seg);
+                inicio = i + 1;
+            }
+        }
+        String ultima = detalle.substring(inicio).trim();
+        if (!ultima.isEmpty()) partes.add(ultima);
+        return partes.toArray(new String[0]);
     }
 
     static Map<String, Map<String, Integer>> agruparTotales(List<ItemPedido> items, String origen) {
