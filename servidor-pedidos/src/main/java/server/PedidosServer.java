@@ -248,7 +248,7 @@ public class PedidosServer {
 
                         if ("FUERA HORARIO".equals(franja)) {
                             enviarRespuesta(exchange, 403,
-                                    "{\"exito\":false,\"error\":\"Pedido fuera de horario permitido\"}");
+                                    "{\"exito\":false,\"error\":\"No se aceptan pedidos en este horario.\"}");
                             return;
                         }
 
