@@ -34,11 +34,10 @@ public class Conexion {
 
     private static final String URL
             = "jdbc:postgresql://" + POSTGRES_HOST + ":" + POSTGRES_PORT + "/" + POSTGRES_DB
-            + "?sslmode=require&connectTimeout=10&socketTimeout=15";
+            + "?sslmode=require&connectTimeout=10&socketTimeout=15&prepareThreshold=0";
 
     private static final long CACHE_TTL_MS = 2000;
 
-    private static Connection sharedConn;
     private static final Object LOCK = new Object();
 
     private static ConcurrentHashMap<String, CachedResult> cache;
@@ -46,27 +45,11 @@ public class Conexion {
     static {
         try {
             Class.forName("org.postgresql.Driver");
-
             cache = new ConcurrentHashMap<>();
-
-            sharedConn = crearConexion();
-
             System.out.println("Conexión PostgreSQL inicializada");
-
         } catch (Exception e) {
             System.err.println("[Conexion] " + e.getMessage());
         }
-    }
-
-    private static Connection crearConexion() throws SQLException {
-        Connection conn = DriverManager.getConnection(
-                URL,
-                POSTGRES_USER,
-                POSTGRES_PASSWORD
-        );
-
-        conn.setAutoCommit(true);
-        return conn;
     }
 
     public static Connection conectar() throws SQLException {
@@ -125,16 +108,8 @@ public class Conexion {
     }
 
     public static void shutdown() {
-        try {
-            if (sharedConn != null && !sharedConn.isClosed()) {
-                sharedConn.close();
-            }
-        } catch (SQLException e) {
-            System.err.println("Error cerrando conexión: " + e.getMessage());
-        }
-
         cache.clear();
-        System.out.println("✓ Conexión PostgreSQL cerrada");
+        System.out.println("✓ Cache PostgreSQL cerrado");
     }
 
     private static class CachedResult {
