@@ -277,12 +277,15 @@ public class PedidosServer {
 
                         if (id > 0) {
                             descontarInventarioDesdeItems(body);
+                            enviarRespuesta(exchange, 200, "{"
+                                    + "\"exito\":true,"
+                                    + "\"id\":" + id + ","
+                                    + "\"numero\":" + numeroPedido + "}");
+                        } else {
+                            System.err.println("[PEDIDOS] Error al guardar pedido para: " + cliente);
+                            enviarRespuesta(exchange, 500,
+                                    "{\"exito\":false,\"error\":\"Error al guardar el pedido. Intente de nuevo.\"}");
                         }
-
-                        enviarRespuesta(exchange, 200, "{"
-                                + "\"exito\":true,"
-                                + "\"id\":" + id + ","
-                                + "\"numero\":" + numeroPedido + "}");
 
                     } catch (Exception e) {
                         System.err.println("[PedidosServer] " + e.getMessage());
