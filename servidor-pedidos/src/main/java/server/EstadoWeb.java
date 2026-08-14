@@ -8,7 +8,7 @@ public class EstadoWeb {
         if (overrideManual != null) {
             return overrideManual;
         }
-        return true;
+        return false;
     }
 
     public static void setAbierta(Boolean valor) {
