@@ -68,8 +68,8 @@ public class PedidosServer {
     private static long cocinaHtmlTimestamp = 0;
 
     // ── Rate limiting ────────────────────────────────────────────────────
-    private static final long VENTANA_MS = 30_000L;  // 30 segundos entre pedidos
-    private static final int MAX_PEDIDOS_HORA = 50;   //volver a 5
+    private static final long VENTANA_MS = 60_000L;  // 60 segundos entre pedidos
+    private static final int MAX_PEDIDOS_HORA = 20;   // maximo 20 pedidos por hora
     private static final long HORA_MS = 60 * 60 * 1000L;
     private static final long BLOQUEO_MS = 30 * 60 * 1000L;
 
@@ -780,7 +780,7 @@ servidor.createContext("/img/", exchange -> {
         Long bloqueado = bloqueadoHasta.get(id);
         if (bloqueado != null && ahora < bloqueado) {
             long min = (bloqueado - ahora) / 60_000 + 1;
-            return "{\"exito\":false,\"error\":\"Demasiados intentos. Reintenta en " + min + " minutos.\"}";
+            return "{\"exito\":false,\"error\":\"Demasiados intentos. Reintente en " + min + " minutos.\"}";
         } else if (bloqueado != null) {
             bloqueadoHasta.remove(id);
             contadorPorIp.remove(id);
@@ -791,7 +791,7 @@ servidor.createContext("/img/", exchange -> {
         if (ultimo != null && (ahora - ultimo) < VENTANA_MS) {
             long segs = (VENTANA_MS - (ahora - ultimo)) / 1000 + 1;
             System.out.println("[THROTTLE] Bloqueado por ventana: " + segs + "s restantes. ID: " + id + ", ultimo: " + ultimo + ", ahora: " + ahora);
-            return "{\"exito\":false,\"error\":\"Espera " + segs + " segundos antes de enviar otro pedido.\"}";
+            return "{\"exito\":false,\"error\":\"Espere " + segs + " segundos antes de enviar otro pedido.\"}";
         }
 
         int contador = contadorPorIp.getOrDefault(id, 0);
