@@ -101,10 +101,17 @@ public class VentaDAO {
 
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        resumen.put(
-                                rs.getString("nombre"),
-                                rs.getInt("total")
-                        );
+                        String nombre = rs.getString("nombre");
+                        String tipo = rs.getString("producto_tipo");
+                        // Reconstruct full name with category prefix for report filtering
+                        if ("empanada".equals(tipo) && !nombre.toLowerCase().startsWith("empanada")) {
+                            nombre = "Empanada " + nombre;
+                        } else if ("sopaipilla".equals(tipo) && !nombre.toLowerCase().startsWith("sopaipilla")) {
+                            nombre = "Sopaipilla " + nombre;
+                        } else if ("churro".equals(tipo) && !nombre.toLowerCase().startsWith("churro")) {
+                            nombre = "Churro " + nombre;
+                        }
+                        resumen.put(nombre, rs.getInt("total"));
                     }
                 }
             }
@@ -121,7 +128,17 @@ public class VentaDAO {
 
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        resumen.merge(rs.getString("nombre"), rs.getInt("total"), Integer::sum);
+                        String nombre = rs.getString("nombre");
+                        String nLower = nombre != null ? nombre.toLowerCase().trim() : "";
+                        // Agregar prefijo si es empanada/sopaipilla/churro sin prefijo
+                        if ((nLower.contains("empanada") || nLower.contains("arma")) && !nLower.startsWith("empanada")) {
+                            nombre = "Empanada " + nombre;
+                        } else if (nLower.contains("sopaipilla") && !nLower.startsWith("sopaipilla")) {
+                            nombre = "Sopaipilla " + nombre;
+                        } else if (nLower.contains("churro") && !nLower.startsWith("churro")) {
+                            nombre = "Churro " + nombre;
+                        }
+                        resumen.merge(nombre, rs.getInt("total"), Integer::sum);
                     }
                 }
             }
@@ -550,18 +567,7 @@ public class VentaDAO {
                 }
             }
 
-            int desdePedidos = 0;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM pedidos WHERE fecha_hora::date = ? AND origen = 'WEB' AND estado = 'COBRADO'")) {
-                ps.setDate(1, sqlFecha);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        desdePedidos = rs.getInt(1);
-                    }
-                }
-            }
-
-            return desdeVentas + desdePedidos;
+            return desdeVentas;
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -599,18 +605,7 @@ public class VentaDAO {
                 }
             }
 
-            int desdePedidos = 0;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM pedidos WHERE fecha_hora::date = ? AND origen = 'LOCAL' AND estado = 'COBRADO'")) {
-                ps.setDate(1, sqlFecha);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        desdePedidos = rs.getInt(1);
-                    }
-                }
-            }
-
-            return desdeVentas + desdeRapidas + desdePedidos;
+            return desdeVentas + desdeRapidas;
 
         } catch (SQLException e) {
             e.printStackTrace();
