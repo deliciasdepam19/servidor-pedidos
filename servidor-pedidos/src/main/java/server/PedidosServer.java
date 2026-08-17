@@ -497,7 +497,8 @@ public class PedidosServer {
                     for (int i = 0; i < activos.size(); i++) {
                         PedidosDAO.PedidoBD p = activos.get(i);
                         String origen = p.origen != null ? p.origen : "WEB";
-                        List<ItemPedido> items = parsearDetalle(p.detalle, catMap);
+                        Map<String, String> catItems = parsearCategoriasItems(p.categoriasDetalle);
+                        List<ItemPedido> items = parsearDetalle(p.detalle, catMap, catItems);
                         Map<String, Map<String, Integer>> totalesOrigen = agruparTotales(items, origen);
                         for (Map.Entry<String, Map<String, Integer>> e : totalesOrigen.entrySet()) {
                             totalesGeneral.putIfAbsent(e.getKey(), new LinkedHashMap<>());
@@ -840,18 +841,39 @@ servidor.createContext("/img/", exchange -> {
     // â”€â”€ CategorÃ­as e inventario â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private String construirCategoriasDetalle(String json) {
         List<ItemCarrito> items = extraerItems(json);
-        Map<String, Integer> conteo = new LinkedHashMap<>();
-        for (ItemCarrito item : items) {
-            conteo.merge(normalizarCategoria(item.categoria), item.cantidad, Integer::sum);
-        }
+        // Formato: "[cat]Nombre | [cat]Nombre" — permite resolver categoría por item en parsearDetalle
         StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, Integer> e : conteo.entrySet()) {
+        for (ItemCarrito item : items) {
             if (sb.length() > 0) {
-                sb.append(",");
+                sb.append(" | ");
             }
-            sb.append(e.getKey()).append(":").append(e.getValue());
+            String cat = normalizarCategoria(item.categoria);
+            String nombre = item.nombre != null ? item.nombre.trim() : "";
+            sb.append("[").append(cat).append("]").append(nombre);
         }
         return sb.toString();
+    }
+
+    /**
+     * Parsea el formato "[cat]Nombre | [cat]Nombre" a un map nombreLower → categoría.
+     */
+    static Map<String, String> parsearCategoriasItems(String catsDetalle) {
+        Map<String, String> mapa = new LinkedHashMap<>();
+        if (catsDetalle == null || catsDetalle.isBlank()) return mapa;
+        String[] partes = catsDetalle.split("\\|");
+        for (String parte : partes) {
+            parte = parte.trim();
+            // Formato: "[empanada]Arma tu Empanada"
+            int cierre = parte.indexOf(']');
+            if (parte.startsWith("[") && cierre > 0) {
+                String cat = parte.substring(1, cierre).trim();
+                String nombre = parte.substring(cierre + 1).trim();
+                if (!cat.isEmpty() && !nombre.isEmpty()) {
+                    mapa.put(nombre.toLowerCase().trim(), cat);
+                }
+            }
+        }
+        return mapa;
     }
 
     private void descontarInventarioDesdeItems(String json) {
@@ -993,7 +1015,7 @@ servidor.createContext("/img/", exchange -> {
                 + "}";
     }
 
-    private String normalizar(String s) {
+    private static String normalizar(String s) {
         if (s == null) return "";
         return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "").toLowerCase();
@@ -1114,6 +1136,11 @@ servidor.createContext("/img/", exchange -> {
     }
 
     static List<ItemPedido> parsearDetalle(String detalle, Map<String, String> catMap) {
+        return parsearDetalle(detalle, catMap, (Map<String, String>) null);
+    }
+
+    static List<ItemPedido> parsearDetalle(String detalle, Map<String, String> catMap,
+            Map<String, String> catItems) {
         List<ItemPedido> items = new ArrayList<>();
         if (detalle == null || detalle.isBlank()) return items;
 
@@ -1148,7 +1175,22 @@ servidor.createContext("/img/", exchange -> {
             }
 
             if (texto.isEmpty()) continue;
-            String cat = resolverCategoria(texto, catMap);
+
+            // 1) Intentar resolver por categoría del JSON (catItems) — más confiable
+            String cat = null;
+            if (catItems != null && !catItems.isEmpty()) {
+                String textoNorm = normalizar(texto);
+                for (Map.Entry<String, String> e : catItems.entrySet()) {
+                    if (textoNorm.contains(e.getKey()) || e.getKey().contains(textoNorm)) {
+                        cat = e.getValue();
+                        break;
+                    }
+                }
+            }
+            // 2) Fallback: resolver por nombre contra catMap (local orders, legacy)
+            if (cat == null) {
+                cat = resolverCategoria(texto, catMap);
+            }
             items.add(new ItemPedido(texto, cantidad, cat));
         }
         return items;
