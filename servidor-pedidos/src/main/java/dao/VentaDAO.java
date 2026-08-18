@@ -491,14 +491,38 @@ public class VentaDAO {
             }
 
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COALESCE(SUM(vr.cantidad), 0) FROM ventas_rapidas vr "
+                    "SELECT vr.nombre, SUM(vr.cantidad) as total, "
+                    + "ci.categoria as carta_categoria "
+                    + "FROM ventas_rapidas vr "
                     + "LEFT JOIN ventas v ON v.id = vr.grupo_venta_id "
+                    + "LEFT JOIN carta_items ci ON LOWER(TRIM(ci.nombre)) = LOWER(TRIM(vr.nombre)) "
                     + "WHERE vr.fecha::date = ? "
-                    + "AND (vr.tipo_pago != 'PENDIENTE' OR v.tipo_pago != 'PENDIENTE')")) {
+                    + "AND (vr.tipo_pago != 'PENDIENTE' OR v.tipo_pago IS NULL OR v.tipo_pago != 'PENDIENTE') "
+                    + "GROUP BY vr.nombre, ci.categoria")) {
                 ps.setDate(1, sqlFecha);
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        result[2] += rs.getInt(1);
+                    while (rs.next()) {
+                        String nombre = rs.getString("nombre");
+                        int total = rs.getInt("total");
+                        String cartaCat = rs.getString("carta_categoria");
+                        if (nombre != null) {
+                            String n = nombre.toLowerCase().trim();
+                            String catNorm = cartaCat != null
+                                    ? java.text.Normalizer.normalize(cartaCat, java.text.Normalizer.Form.NFD)
+                                            .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                                            .toLowerCase().trim()
+                                    : "";
+                            if (catNorm.contains("empanada")
+                                    || n.contains("empanada") || n.contains("arma")) {
+                                result[0] += total;
+                            } else if (catNorm.contains("sopaipilla") || n.contains("sopaipilla")) {
+                                result[1] += total;
+                            } else {
+                                result[2] += total;
+                            }
+                        } else {
+                            result[2] += total;
+                        }
                     }
                 }
             }
