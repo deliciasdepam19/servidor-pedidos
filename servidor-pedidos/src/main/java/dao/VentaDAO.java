@@ -255,7 +255,7 @@ public class VentaDAO {
             String nombreCliente) {
 
         return registrarVentaConRapidos(items, categorias, nombres, precios,
-                tipoPago, nombreCliente, null, null, null);
+                tipoPago, nombreCliente, null, null, null, "LOCAL");
     }
 
     public boolean registrarVentaConRapidos(
@@ -267,7 +267,8 @@ public class VentaDAO {
             String nombreCliente,
             Map<String, Integer> rapidosCant,
             Map<String, Double> rapidosPrecios,
-            Map<String, String> rapidosNombres) {
+            Map<String, String> rapidosNombres,
+            String origen) {
 
         Connection conn = null;
 
@@ -311,12 +312,13 @@ public class VentaDAO {
 
             if (!items.isEmpty()) {
                 try (PreparedStatement psVenta = conn.prepareStatement(
-                        "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) VALUES (?, ?, ?, ?)",
+                        "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente, origen) VALUES (?, ?, ?, ?, ?)",
                         Statement.RETURN_GENERATED_KEYS)) {
                     psVenta.setDate(1, hoy);
                     psVenta.setDouble(2, totalVenta);
                     psVenta.setString(3, tipoPago);
                     psVenta.setString(4, nombreCliente);
+                    psVenta.setString(5, origen != null ? origen : "LOCAL");
                     psVenta.executeUpdate();
                     try (ResultSet keys = psVenta.getGeneratedKeys()) {
                         if (!keys.next()) {
@@ -821,7 +823,8 @@ public class VentaDAO {
             Map<String, Double> precios,
             Map<String, Integer> ids,
             String metodoPago,
-            String nombreCliente) {
+            String nombreCliente,
+            String origen) {
 
         Connection conn = null;
         try {
@@ -853,13 +856,14 @@ public class VentaDAO {
             }
 
             int ventaId;
-            String sqlVenta = "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente) "
-                    + "VALUES (?, ?, ?, ?)";
+            String sqlVenta = "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente, origen) "
+                    + "VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sqlVenta, Statement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, java.time.LocalDate.now().toString());
                 ps.setDouble(2, total);
                 ps.setString(3, metodoPago);
                 ps.setString(4, nombreCliente);
+                ps.setString(5, origen != null ? origen : "LOCAL");
                 ps.executeUpdate();
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (!rs.next()) {
@@ -1009,7 +1013,8 @@ public class VentaDAO {
             Map<String, Double> precios,
             Map<String, Integer> ids,
             String tipoPago,
-            String nombreCliente) {
+            String nombreCliente,
+            String origen) {
 
         Connection conn = null;
         try {
@@ -1037,7 +1042,7 @@ public class VentaDAO {
                     ps.setDouble(2, totalVenta);
                     ps.setString(3, tipoPago);
                     ps.setString(4, nombreCliente);
-                    ps.setString(5, "LOCAL");
+                    ps.setString(5, origen != null ? origen : "LOCAL");
                     ps.executeUpdate();
                     try (ResultSet keys = ps.getGeneratedKeys()) {
                         if (!keys.next()) {
