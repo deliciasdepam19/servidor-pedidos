@@ -34,7 +34,7 @@ public class ReporteRapidosDAO {
                 double totalEfec = rs.getDouble("total_efectivo");
                 double totalTransf = rs.getDouble("total_transferencia");
 
-                String detalleRap = filtrarDetalleRapidos(detalleCompleto);
+                String detalleRap = filtrarDetalleRapidos(detalleCompleto, conn);
                 String masVendido = extraerMasVendido(detalleRap);
 
                 double totalRap = calcularTotalDesdeDetalle(detalleRap, conn);
@@ -87,7 +87,7 @@ public class ReporteRapidosDAO {
         return 0;
     }
 
-    private String filtrarDetalleRapidos(String detalle) {
+    private String filtrarDetalleRapidos(String detalle, Connection conn) {
         if (detalle == null || detalle.isBlank()) {
             return "";
         }
@@ -97,7 +97,32 @@ public class ReporteRapidosDAO {
             if (t.isEmpty()) {
                 continue;
             }
-            if (!t.toLowerCase().startsWith("empanada")) {
+            String nombreLower = t.toLowerCase();
+            String nombreProd = t.contains(":") ? t.split(":")[0].trim().toLowerCase() : nombreLower;
+            boolean esEmpanadaOSopaipilla = nombreLower.startsWith("empanada")
+                    || nombreLower.startsWith("sopaipilla");
+            if (!esEmpanadaOSopaipilla && conn != null) {
+                try {
+                    PreparedStatement ps = conn.prepareStatement(
+                            "SELECT categoria FROM carta_items WHERE LOWER(TRIM(nombre)) = ? LIMIT 1");
+                    ps.setString(1, nombreProd);
+                    ResultSet rs = ps.executeQuery();
+                    if (rs.next()) {
+                        String cat = rs.getString("categoria");
+                        if (cat != null) {
+                            String catLower = cat.toLowerCase();
+                            if (catLower.contains("empanada") || catLower.contains("sopaipilla")) {
+                                esEmpanadaOSopaipilla = true;
+                            }
+                        }
+                    }
+                    rs.close();
+                    ps.close();
+                } catch (SQLException e) {
+                    // ignore — fall back to name matching
+                }
+            }
+            if (!esEmpanadaOSopaipilla) {
                 sb.append(t).append("|");
             }
         }
