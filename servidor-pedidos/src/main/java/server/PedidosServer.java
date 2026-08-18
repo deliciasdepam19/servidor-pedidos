@@ -39,6 +39,7 @@ public class PedidosServer {
     private final List<Map<String, Object>> notificaciones = new ArrayList<>();
 
     private final Object pedidoLock = new Object();
+    private final java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
     private static final int PUERTO = System.getenv("PORT") != null
             ? Integer.parseInt(System.getenv("PORT")) : 8888;
@@ -276,7 +277,9 @@ public class PedidosServer {
                         int numeroPedido = resultado[1];
 
                         if (id > 0) {
-                            descontarInventarioDesdeItems(body);
+                            // Descontar inventario en segundo plano para no bloquear la respuesta
+                            final String bodyCopy = body;
+                            executor.submit(() -> descontarInventarioDesdeItems(bodyCopy));
                             enviarRespuesta(exchange, 200, "{"
                                     + "\"exito\":true,"
                                     + "\"id\":" + id + ","
