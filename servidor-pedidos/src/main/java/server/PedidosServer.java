@@ -219,10 +219,28 @@ public class PedidosServer {
                     try {
                         String cliente = sanitizar(extraerValor(body, "cliente"));
                         String telefono = sanitizar(extraerValor(body, "telefono"));
+                        // ── Server-side input validation ──
+                        cliente = cliente.replaceAll("[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\\s]", "").trim();
+                        if (cliente.length() > 60) cliente = cliente.substring(0, 60);
+                        if (cliente.isBlank()) cliente = "Cliente";
+                        telefono = telefono.replaceAll("[^0-9]", "").trim();
+                        if (!telefono.equals("-") && telefono.length() != 9) {
+                            enviarRespuesta(exchange, 400,
+                                    "{\"exito\":false,\"error\":\"Telefono debe tener 9 digitos\"}");
+                            return;
+                        }
 
                         String errorThrottle = verificarThrottle(exchange, telefono);
                         if (errorThrottle != null) {
                             enviarRespuesta(exchange, 429, errorThrottle);
+                            return;
+                        }
+                        // ── CSRF: validate Origin header ──
+                        String reqOrigin = exchange.getRequestHeaders().getFirst("Origin");
+                        String referer = exchange.getRequestHeaders().getFirst("Referer");
+                        if (reqOrigin != null && !reqOrigin.contains("onrender.com") && !reqOrigin.contains("delicias")) {
+                            enviarRespuesta(exchange, 403,
+                                    "{\"exito\":false,\"error\":\"Origen no permitido\"}");
                             return;
                         }
                         String detalle = construirDetalleDesdeItems(body);
@@ -1086,10 +1104,24 @@ servidor.createContext("/img/", exchange -> {
                 .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 
+    private static final String ALLOWED_ORIGIN = System.getenv("ALLOWED_ORIGIN") != null
+            ? System.getenv("ALLOWED_ORIGIN") : "https://servidor-pedidos-i0jg.onrender.com";
+
     private void agregarCorsHeaders(HttpExchange e) {
-        e.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        String origin = e.getRequestHeaders().getFirst("Origin");
+        String allowed = (origin != null && !origin.isBlank()) ? origin : ALLOWED_ORIGIN;
+        if (allowed.contains("onrender.com") || allowed.contains("delicias")) {
+            e.getResponseHeaders().set("Access-Control-Allow-Origin", allowed);
+        } else {
+            e.getResponseHeaders().set("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+        }
         e.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         e.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        e.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
+        e.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        e.getResponseHeaders().set("X-Frame-Options", "DENY");
+        e.getResponseHeaders().set("X-XSS-Protection", "1; mode=block");
+        e.getResponseHeaders().set("Referrer-Policy", "strict-origin-when-cross-origin");
     }
 
     private void enviarRespuesta(HttpExchange ex, int code, String r) throws IOException {
@@ -1106,9 +1138,11 @@ servidor.createContext("/img/", exchange -> {
     }
 
     private String sanitizar(String v) {
-        if (v == null) return "-";
-        if (v.length() > 500) v = v.substring(0, 500);
-        return v.replaceAll("[<>\"']", "").trim();
+        if (v == null || v.isBlank()) return "-";
+        v = v.replaceAll("[<>\"'%;()&+\\-\\/\\\\=]", "");
+        v = v.trim();
+        if (v.length() > 200) v = v.substring(0, 200);
+        return v.isEmpty() ? "-" : v;
     }
 
     // ── Kitchen Display: helpers ────────────────────────────────────────────
