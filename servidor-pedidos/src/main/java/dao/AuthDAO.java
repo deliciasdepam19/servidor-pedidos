@@ -136,4 +136,22 @@ public class AuthDAO {
         }
         return null;
     }
+
+    // Eliminar cliente
+    public boolean eliminarCliente(String email) {
+        String sql = "DELETE FROM clientes WHERE email = ?";
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, email);
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            System.err.println("[AuthDAO] eliminarCliente: " + e.getMessage());
+        } finally {
+            if (conn != null) Conexion.devolver(conn);
+        }
+        return false;
+    }
 }

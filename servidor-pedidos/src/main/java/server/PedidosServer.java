@@ -907,6 +907,26 @@ servidor.createContext("/img/", exchange -> {
             }
         });
 
+        // Eliminar cuenta
+        servidor.createContext("/api/auth/eliminar-cuenta", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String email = extraerValor(body, "email").toLowerCase().trim();
+                    boolean ok = authDAO.eliminarCliente(email);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
+                } catch (Exception e) {
+                    System.err.println("[AUTH] eliminar-cuenta: " + e.getMessage());
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
     }
