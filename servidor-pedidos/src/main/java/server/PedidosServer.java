@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import dao.AdminDAO;
 import dao.DispositivoDAO;
+import dao.NotificacionDAO;
 import dao.AuthDAO;
 import dao.InventarioDAO;
 import dao.PedidosDAO;
@@ -44,8 +45,8 @@ public class PedidosServer {
     private final InventarioDAO invDAO = new InventarioDAO();
     private final AdminDAO adminDAO = new AdminDAO();
     private final DispositivoDAO dispositivoDAO = new DispositivoDAO();
+    private final NotificacionDAO notificacionDAO = new NotificacionDAO();
     private final AuthDAO authDAO = new AuthDAO();
-    private final List<Map<String, Object>> notificaciones = new ArrayList<>();
 
     private final Object pedidoLock = new Object();
     private final java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
@@ -676,6 +677,7 @@ servidor.createContext("/img/", exchange -> {
         });
 
         // ── Notificaciones para app ────────────────────────────────────────────
+        // ── Notificaciones para app (Supabase + push) ─────────────────────────
         servidor.createContext("/api/notificaciones", exchange -> {
 
             agregarCorsHeaders(exchange);
@@ -693,20 +695,16 @@ servidor.createContext("/img/", exchange -> {
                     String icono = extraerValor(body, "icono");
                     String color = extraerValor(body, "color");
 
-                    Map<String, Object> notif = new LinkedHashMap<>();
-                    notif.put("id", notificaciones.size() + 1);
-                    notif.put("titulo", titulo);
-                    notif.put("mensaje", mensaje);
-                    notif.put("icono", "-".equals(icono) ? "bell-outline" : icono);
-                    notif.put("color", "-".equals(color) ? "#40cee0" : color);
-                    java.time.ZoneId chile = java.time.ZoneId.of("America/Santiago");
-                    java.time.ZonedDateTime now = java.time.ZonedDateTime.now(chile);
-                    notif.put("fecha", now.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-                    notif.put("hora", now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
-                    notif.put("createdAt", System.currentTimeMillis());
-                    notificaciones.add(notif);
+                    // 1. Guardar en Supabase
+                    long id = notificacionDAO.guardar(
+                            titulo, mensaje,
+                            "-".equals(icono) ? "bell-outline" : icono,
+                            "-".equals(color) ? "#40cee0" : color);
 
-                    enviarRespuesta(exchange, 200, "{\"exito\":true,\"id\":" + notif.get("id") + "}");
+                    // 2. Enviar push a todos los dispositivos registrados
+                    new Thread(() -> enviarPushNotificacion(titulo, mensaje)).start();
+
+                    enviarRespuesta(exchange, 200, "{\"exito\":true,\"id\":" + id + "}");
                 } catch (Exception e) {
                     e.printStackTrace();
                     enviarRespuesta(exchange, 400, "{\"exito\":false}");
@@ -715,8 +713,8 @@ servidor.createContext("/img/", exchange -> {
 
             if ("GET".equals(exchange.getRequestMethod())) {
                 try {
-                    int start = Math.max(0, notificaciones.size() - 50);
-                    List<Map<String, Object>> recent = notificaciones.subList(start, notificaciones.size());
+                    // Leer desde Supabase en vez de memoria
+                    List<Map<String, Object>> recent = notificacionDAO.listarRecientes();
 
                     StringBuilder json = new StringBuilder("[");
                     for (int i = 0; i < recent.size(); i++) {
@@ -729,7 +727,7 @@ servidor.createContext("/img/", exchange -> {
                         json.append("\"color\":\"").append(escaparJson((String)n.get("color"))).append("\",");
                         json.append("\"fecha\":\"").append(escaparJson((String)n.get("fecha"))).append("\",");
                         json.append("\"hora\":\"").append(escaparJson((String)n.get("hora"))).append("\",");
-                        json.append("\"createdAt\":").append(n.get("createdAt"));
+                        json.append("\"createdAt\":").append(n.get("created_at"));
                         json.append("}");
                         if (i < recent.size() - 1) json.append(",");
                     }
@@ -1427,6 +1425,39 @@ servidor.createContext("/img/", exchange -> {
         }
         System.err.println("[PUSH] HTTP " + response.statusCode() + ": " + response.body());
         return false;
+    }
+
+    /**
+     * Enviar push notification de anuncio/promoción a todos los dispositivos registrados.
+     */
+    private void enviarPushNotificacion(String titulo, String mensaje) {
+        try {
+            List<String> tokens = notificacionDAO.obtenerTodosLosTokens();
+            if (tokens.isEmpty()) {
+                System.out.println("[PUSH-NOTIF] No hay dispositivos registrados");
+                return;
+            }
+
+            List<String> tokensInvalidos = new ArrayList<>();
+            for (String token : tokens) {
+                try {
+                    boolean ok = enviarExpoPush(token, titulo, mensaje,
+                            Map.of("type", "aviso", "titulo", titulo));
+                    if (!ok) tokensInvalidos.add(token);
+                } catch (Exception e) {
+                    System.err.println("[PUSH-NOTIF] Error a " + token + ": " + e.getMessage());
+                    tokensInvalidos.add(token);
+                }
+            }
+
+            if (!tokensInvalidos.isEmpty()) {
+                dispositivoDAO.limpiarTokensInvalidos(tokensInvalidos);
+            }
+
+            System.out.println("[PUSH-NOTIF] Enviado a " + tokens.size() + " dispositivos");
+        } catch (Exception e) {
+            System.err.println("[PUSH-NOTIF] Error general: " + e.getMessage());
+        }
     }
 
     // ── Kitchen Display: helpers ────────────────────────────────────────────
