@@ -63,9 +63,9 @@ public class AuthDAO {
         return false;
     }
 
-    // Crear o actualizar usuario por email
-    public String crearUsuario(String email, String nombre) {
-        String sql = "INSERT INTO usuarios (email, nombre) VALUES (?, ?) "
+    // Crear o actualizar cliente por email
+    public String crearCliente(String email, String nombre) {
+        String sql = "INSERT INTO clientes (email, nombre) VALUES (?, ?) "
                 + "ON CONFLICT (email) DO UPDATE SET nombre = EXCLUDED.nombre "
                 + "RETURNING id";
         Connection conn = null;
@@ -81,16 +81,16 @@ public class AuthDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[AuthDAO] crearUsuario: " + e.getMessage());
+            System.err.println("[AuthDAO] crearCliente: " + e.getMessage());
         } finally {
             if (conn != null) Conexion.devolver(conn);
         }
         return null;
     }
 
-    // Obtener usuario por email
-    public Object[] obtenerUsuario(String email) {
-        String sql = "SELECT id, nombre, email, telefono FROM usuarios WHERE email = ?";
+    // Obtener cliente por email
+    public Object[] obtenerCliente(String email) {
+        String sql = "SELECT id, nombre, email FROM clientes WHERE email = ?";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
@@ -101,14 +101,13 @@ public class AuthDAO {
                         return new Object[]{
                             rs.getString("id"),
                             rs.getString("nombre"),
-                            rs.getString("email"),
-                            rs.getString("telefono")
+                            rs.getString("email")
                         };
                     }
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[AuthDAO] obtenerUsuario: " + e.getMessage());
+            System.err.println("[AuthDAO] obtenerCliente: " + e.getMessage());
         } finally {
             if (conn != null) Conexion.devolver(conn);
         }

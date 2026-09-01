@@ -857,9 +857,9 @@ servidor.createContext("/img/", exchange -> {
                         return;
                     }
 
-                    // Crear o obtener usuario
-                    String userId = authDAO.crearUsuario(email, null);
-                    Object[] usuario = authDAO.obtenerUsuario(email);
+                    // Crear u obtener cliente
+                    String userId = authDAO.crearCliente(email, null);
+                    Object[] usuario = authDAO.obtenerCliente(email);
 
                     // Token simple (en producción usar JWT)
                     String token = UUID.randomUUID().toString();
