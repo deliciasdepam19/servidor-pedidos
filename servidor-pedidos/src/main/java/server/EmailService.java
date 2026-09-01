@@ -8,7 +8,7 @@ import java.net.http.HttpResponse;
 public class EmailService {
 
     private static final String RESEND_API_KEY = System.getenv("RESEND_API_KEY");
-    private static final String FROM_EMAIL = "deliciasdepam@appsdelicias.com";
+    private static final String FROM_EMAIL = "Delicias de Pam <onboarding@resend.dev>";
 
     public static boolean enviarCodigoOTP(String email, String codigo) {
         if (RESEND_API_KEY == null || RESEND_API_KEY.isBlank()) {
