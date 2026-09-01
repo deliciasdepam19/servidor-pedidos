@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import dao.AdminDAO;
+import dao.DispositivoDAO;
 import dao.InventarioDAO;
 import dao.PedidosDAO;
 import dao.ProductoDAO;
@@ -13,6 +14,10 @@ import server.EstadoWeb;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.Connection;
@@ -36,6 +41,7 @@ public class PedidosServer {
     private final RecetaDAO recetaDAO = new RecetaDAO();
     private final InventarioDAO invDAO = new InventarioDAO();
     private final AdminDAO adminDAO = new AdminDAO();
+    private final DispositivoDAO dispositivoDAO = new DispositivoDAO();
     private final List<Map<String, Object>> notificaciones = new ArrayList<>();
 
     private final Object pedidoLock = new Object();
@@ -59,8 +65,7 @@ public class PedidosServer {
     private HttpServer servidor;
 
     // ── Kitchen Display ──────────────────────────────────────────────────
-    private static final String API_KEY = System.getenv("API_KEY") != null
-            ? System.getenv("API_KEY") : "delicias-kds-2026";
+    private static final String API_KEY = requireEnv("API_KEY");
 
     private static final Pattern PATRON_DETALLE = Pattern.compile("(\\d+)?\\s*(.+)");
     private static final Pattern PATRON_DETALLE_NUEVO = Pattern.compile("(.+):\\s*(\\d+)\\s*uds\\.?");
@@ -96,6 +101,12 @@ public class PedidosServer {
     public PedidosServer() throws IOException {
 
         servidor = HttpServer.create(new InetSocketAddress("0.0.0.0", PUERTO), 0);
+
+        // ── Health check ────────────────────────────────────────────────
+        servidor.createContext("/health", exchange -> {
+            agregarCorsHeaders(exchange);
+            enviarRespuesta(exchange, 200, "{\"ok\":true}");
+        });
 
         servidor.createContext("/api/pedidos/cliente", exchange -> {
             agregarCorsHeaders(exchange);
@@ -170,6 +181,12 @@ public class PedidosServer {
                     String body = readBody(exchange);
                     String nuevoEstado = extraerValor(body, "estado");
                     boolean ok = pedidosDAO.actualizarEstado(id, nuevoEstado);
+
+                    // Enviar push cuando el pedido está listo para retirar
+                    if (ok && "LISTO".equals(nuevoEstado)) {
+                        enviarPushPedidoListo(id);
+                    }
+
                     enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
                 } catch (Exception e) {
                     enviarRespuesta(exchange, 400, "{\"exito\":false}");
@@ -727,6 +744,56 @@ servidor.createContext("/img/", exchange -> {
             }
         });
 
+        // ── Dispositivos: registro de push tokens ────────────────────────
+        servidor.createContext("/api/dispositivos/registrar", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String telefono = sanitizar(extraerValor(body, "telefono"));
+                    String token = extraerValor(body, "expo_push_token");
+                    String plataforma = extraerValor(body, "plataforma");
+                    if ("-".equals(plataforma) || plataforma.isBlank()) plataforma = "android";
+
+                    if ("-".equals(telefono) || "-".equals(token)) {
+                        enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"Faltan campos\"}");
+                        return;
+                    }
+
+                    boolean ok = dispositivoDAO.registrar(telefono, token, plataforma);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
+                } catch (Exception e) {
+                    System.err.println("[DISPOSITIVOS] registrar: " + e.getMessage());
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
+        servidor.createContext("/api/dispositivos/eliminar", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String telefono = sanitizar(extraerValor(body, "telefono"));
+                    String token = extraerValor(body, "expo_push_token");
+
+                    boolean ok = dispositivoDAO.eliminar(telefono, token);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
+                } catch (Exception e) {
+                    System.err.println("[DISPOSITIVOS] eliminar: " + e.getMessage());
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
         servidor.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
         System.out.println("Servidor OK puerto " + PUERTO);
     }
@@ -1143,6 +1210,88 @@ servidor.createContext("/img/", exchange -> {
         v = v.trim();
         if (v.length() > 200) v = v.substring(0, 200);
         return v.isEmpty() ? "-" : v;
+    }
+
+    // ── Push Notifications ──────────────────────────────────────────────
+    private void enviarPushPedidoListo(int pedidoId) {
+        try {
+            PedidosDAO.PedidoBD pedido = pedidosDAO.cargarPedidoActivoPorId(pedidoId);
+            if (pedido == null) {
+                System.out.println("[PUSH] No se encontró pedido " + pedidoId);
+                return;
+            }
+
+            List<String> tokens = dispositivoDAO.obtenerTokensPorTelefono(pedido.telefono);
+            if (tokens.isEmpty()) {
+                System.out.println("[PUSH] No hay dispositivos para: " + pedido.telefono);
+                return;
+            }
+
+            String titulo = "¡Tu pedido está listo!";
+            String mensaje = "Ya pasás a retirarlo. ¡Gracias! 😊";
+            String numeroFormateado = PedidosDAO.formatearNumero(pedido.numero, pedido.origen);
+
+            List<String> tokensInvalidos = new ArrayList<>();
+            for (String token : tokens) {
+                try {
+                    boolean ok = enviarExpoPush(token, titulo, mensaje,
+                            Map.of("orderId", String.valueOf(pedidoId), "numero", numeroFormateado));
+                    if (!ok) tokensInvalidos.add(token);
+                } catch (Exception e) {
+                    System.err.println("[PUSH] Error a " + token + ": " + e.getMessage());
+                    tokensInvalidos.add(token);
+                }
+            }
+
+            if (!tokensInvalidos.isEmpty()) {
+                dispositivoDAO.limpiarTokensInvalidos(tokensInvalidos);
+            }
+
+            System.out.println("[PUSH] Enviado a " + tokens.size() + " dispositivos para " + numeroFormateado);
+        } catch (Exception e) {
+            System.err.println("[PUSH] Error general: " + e.getMessage());
+        }
+    }
+
+    private boolean enviarExpoPush(String expoPushToken, String title, String body,
+                                    Map<String, String> data) throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+
+        StringBuilder dataJson = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, String> e : data.entrySet()) {
+            if (!first) dataJson.append(",");
+            first = false;
+            dataJson.append("\"").append(e.getKey()).append("\":\"").append(e.getValue()).append("\"");
+        }
+        dataJson.append("}");
+
+        String jsonPayload = "{"
+                + "\"to\":\"" + expoPushToken + "\","
+                + "\"title\":\"" + escaparJson(title) + "\","
+                + "\"body\":\"" + escaparJson(body) + "\","
+                + "\"data\":" + dataJson.toString() + ","
+                + "\"sound\":\"default\""
+                + "}";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://exp.host/--/api/v2/push/send"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() == 200) {
+            String respBody = response.body();
+            if (respBody.contains("\"error\"")) {
+                System.err.println("[PUSH] Expo error: " + respBody);
+                return false;
+            }
+            return true;
+        }
+        System.err.println("[PUSH] HTTP " + response.statusCode() + ": " + response.body());
+        return false;
     }
 
     // ── Kitchen Display: helpers ────────────────────────────────────────────
