@@ -1405,7 +1405,8 @@ servidor.createContext("/img/", exchange -> {
                 + "\"body\":\"" + escaparJson(body) + "\","
                 + "\"data\":" + dataJson.toString() + ","
                 + "\"sound\":\"default\","
-                + "\"channelId\":\"pedidos\""
+                + "\"channelId\":\"pedidos\","
+                + "\"priority\":\"high\""
                 + "}";
 
         HttpRequest request = HttpRequest.newBuilder()
