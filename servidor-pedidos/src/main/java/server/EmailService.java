@@ -23,11 +23,11 @@ public class EmailService {
                 + ".footer{color:#6a8f96;font-size:12px;margin-top:24px;}"
                 + "</style></head><body>"
                 + "<div class='card'>"
-                + "<h2 style='color:#40cee0;'>🍞 Delicias de Pam</h2>"
+                + "<h2 style='color:#40cee0;'>Delicias de Pam</h2>"
                 + "<p>Tu código de verificación es:</p>"
                 + "<div class='code'>" + codigo + "</div>"
                 + "<p style='color:#6a8f96;'>Este código expira en 5 minutos.</p>"
-                + "<p class='footer'>Si no solicitaste este código, podés ignorar este mensaje.</p>"
+                + "<p class='footer'>Si no solicitaste este código, puedes ignorar este mensaje.</p>"
                 + "</div></body></html>";
 
         Properties props = new Properties();
