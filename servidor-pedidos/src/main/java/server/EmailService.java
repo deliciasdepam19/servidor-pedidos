@@ -32,56 +32,67 @@ public class EmailService {
 
         try {
             Socket socket = new Socket("smtp.gmail.com", 587);
+            socket.setSoTimeout(15000); // 15 segundos timeout
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 
             // Read greeting
-            reader.readLine();
+            String line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // EHLO
             writer.write("EHLO deliciasdepam.com\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // STARTTLS
             writer.write("STARTTLS\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // Re-negotiate after STARTTLS
             writer.write("EHLO deliciasdepam.com\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // AUTH LOGIN
             writer.write("AUTH LOGIN\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // Username
             writer.write(Base64.getEncoder().encodeToString(GMAIL_USER.getBytes()) + "\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // Password
             writer.write(Base64.getEncoder().encodeToString(GMAIL_APP_PASSWORD.getBytes()) + "\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // MAIL FROM
             writer.write("MAIL FROM:<" + GMAIL_USER + ">\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // RCPT TO
             writer.write("RCPT TO:<" + email + ">\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // DATA
             writer.write("DATA\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // Email content
             writer.write("From: Delicias de Pam <" + GMAIL_USER + ">\r\n");
@@ -93,12 +104,14 @@ public class EmailService {
             writer.write(htmlBody + "\r\n");
             writer.write(".\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             // QUIT
             writer.write("QUIT\r\n");
             writer.flush();
-            readAll(reader);
+            line = reader.readLine();
+            System.out.println("[EMAIL] S: " + line);
 
             writer.close();
             reader.close();
@@ -110,12 +123,6 @@ public class EmailService {
         } catch (Exception e) {
             System.err.println("[EMAIL] Error enviando: " + e.getMessage());
             return false;
-        }
-    }
-
-    private static void readAll(BufferedReader reader) throws IOException {
-        while (reader.ready()) {
-            reader.readLine();
         }
     }
 }
