@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import dao.AdminDAO;
 import dao.DispositivoDAO;
+import dao.AuthDAO;
 import dao.InventarioDAO;
 import dao.PedidosDAO;
 import dao.ProductoDAO;
@@ -24,6 +25,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,6 +44,7 @@ public class PedidosServer {
     private final InventarioDAO invDAO = new InventarioDAO();
     private final AdminDAO adminDAO = new AdminDAO();
     private final DispositivoDAO dispositivoDAO = new DispositivoDAO();
+    private final AuthDAO authDAO = new AuthDAO();
     private final List<Map<String, Object>> notificaciones = new ArrayList<>();
 
     private final Object pedidoLock = new Object();
@@ -789,6 +792,87 @@ servidor.createContext("/img/", exchange -> {
                     enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
                 } catch (Exception e) {
                     System.err.println("[DISPOSITIVOS] eliminar: " + e.getMessage());
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
+        // ── Auth: OTP por email ─────────────────────────────────────────
+        servidor.createContext("/api/auth/enviar-codigo", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String email = extraerValor(body, "email").toLowerCase().trim();
+
+                    if ("-".equals(email) || !email.contains("@")) {
+                        enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"Correo no válido\"}");
+                        return;
+                    }
+
+                    String codigo = authDAO.generarCodigo(email);
+                    if (codigo == null) {
+                        enviarRespuesta(exchange, 500, "{\"exito\":false,\"error\":\"Error generando código\"}");
+                        return;
+                    }
+
+                    boolean enviado = EmailService.enviarCodigoOTP(email, codigo);
+                    if (!enviado) {
+                        enviarRespuesta(exchange, 500, "{\"exito\":false,\"error\":\"Error enviando correo\"}");
+                        return;
+                    }
+
+                    enviarRespuesta(exchange, 200, "{\"exito\":true}");
+                } catch (Exception e) {
+                    System.err.println("[AUTH] enviar-codigo: " + e.getMessage());
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
+        servidor.createContext("/api/auth/verificar-codigo", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String email = extraerValor(body, "email").toLowerCase().trim();
+                    String codigo = extraerValor(body, "codigo");
+
+                    if ("-".equals(email) || "-".equals(codigo)) {
+                        enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"Faltan campos\"}");
+                        return;
+                    }
+
+                    boolean valido = authDAO.verificarCodigo(email, codigo);
+                    if (!valido) {
+                        enviarRespuesta(exchange, 401, "{\"exito\":false,\"error\":\"Código incorrecto o expirado\"}");
+                        return;
+                    }
+
+                    // Crear o obtener usuario
+                    String userId = authDAO.crearUsuario(email, null);
+                    Object[] usuario = authDAO.obtenerUsuario(email);
+
+                    // Token simple (en producción usar JWT)
+                    String token = UUID.randomUUID().toString();
+
+                    String usuarioJson = "{"
+                            + "\"id\":\"" + (usuario != null ? usuario[0] : userId) + "\","
+                            + "\"email\":\"" + email + "\","
+                            + "\"nombre\":\"" + (usuario != null ? usuario[1] : email.split("@")[0]) + "\""
+                            + "}";
+
+                    enviarRespuesta(exchange, 200, "{\"exito\":true,\"token\":\"" + token + "\",\"usuario\":" + usuarioJson + "}");
+                } catch (Exception e) {
+                    System.err.println("[AUTH] verificar-codigo: " + e.getMessage());
                     enviarRespuesta(exchange, 500, "{\"exito\":false}");
                 }
             }
