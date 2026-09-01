@@ -834,6 +834,35 @@ servidor.createContext("/img/", exchange -> {
             }
         });
 
+        // ── Auth: guardar código OTP (email se envía desde frontend) ──
+        servidor.createContext("/api/auth/guardar-codigo", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String email = extraerValor(body, "email").toLowerCase().trim();
+                    String codigo = extraerValor(body, "codigo");
+
+                    if ("-".equals(email) || "-".equals(codigo)) {
+                        enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"Faltan campos\"}");
+                        return;
+                    }
+
+                    // Guardar código en la BD
+                    authDAO.guardarCodigo(email, codigo);
+
+                    enviarRespuesta(exchange, 200, "{\"exito\":true}");
+                } catch (Exception e) {
+                    System.err.println("[AUTH] guardar-codigo: " + e.getMessage());
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
         servidor.createContext("/api/auth/verificar-codigo", exchange -> {
             agregarCorsHeaders(exchange);
             if ("OPTIONS".equals(exchange.getRequestMethod())) {

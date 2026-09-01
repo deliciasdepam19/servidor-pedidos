@@ -5,6 +5,29 @@ import java.util.UUID;
 
 public class AuthDAO {
 
+    // Guardar código OTP
+    public void guardarCodigo(String email, String codigo) {
+        String deleteSql = "DELETE FROM otp_codes WHERE email = ? AND usado = false";
+        String insertSql = "INSERT INTO otp_codes (email, codigo, expira_en) VALUES (?, ?, NOW() + INTERVAL '5 minutes')";
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            try (PreparedStatement ps = conn.prepareStatement(deleteSql)) {
+                ps.setString(1, email);
+                ps.executeUpdate();
+            }
+            try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
+                ps.setString(1, email);
+                ps.setString(2, codigo);
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("[AuthDAO] guardarCodigo: " + e.getMessage());
+        } finally {
+            if (conn != null) Conexion.devolver(conn);
+        }
+    }
+
     // Generar código OTP de 4 dígitos y guardarlo en la BD
     public String generarCodigo(String email) {
         String codigo = String.format("%04d", (int) (Math.random() * 10000));
