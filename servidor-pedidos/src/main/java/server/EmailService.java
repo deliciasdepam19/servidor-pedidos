@@ -1,18 +1,17 @@
 package server;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.io.*;
+import java.net.Socket;
+import java.util.Base64;
 
 public class EmailService {
 
-    private static final String RESEND_API_KEY = System.getenv("RESEND_API_KEY");
-    private static final String FROM_EMAIL = "Delicias de Pam <onboarding@resend.dev>";
+    private static final String GMAIL_USER = System.getenv("GMAIL_USER");
+    private static final String GMAIL_APP_PASSWORD = System.getenv("GMAIL_APP_PASSWORD");
 
     public static boolean enviarCodigoOTP(String email, String codigo) {
-        if (RESEND_API_KEY == null || RESEND_API_KEY.isBlank()) {
-            System.err.println("[EMAIL] RESEND_API_KEY no configurada");
+        if (GMAIL_USER == null || GMAIL_USER.isBlank() || GMAIL_APP_PASSWORD == null || GMAIL_APP_PASSWORD.isBlank()) {
+            System.err.println("[EMAIL] GMAIL_USER o GMAIL_APP_PASSWORD no configurados");
             return false;
         }
 
@@ -31,43 +30,92 @@ public class EmailService {
                 + "<p class='footer'>Si no solicitaste este código, podés ignorar este mensaje.</p>"
                 + "</div></body></html>";
 
-        String jsonPayload = "{"
-                + "\"from\":\"Delicias de Pam <" + FROM_EMAIL + ">\","
-                + "\"to\":[\"" + email + "\"],"
-                + "\"subject\":\"Tu código de verificación - Delicias de Pam\","
-                + "\"html\":\"" + escaparJson(htmlBody) + "\""
-                + "}";
-
         try {
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.resend.com/emails"))
-                    .header("Authorization", "Bearer " + RESEND_API_KEY)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
-                    .build();
+            Socket socket = new Socket("smtp.gmail.com", 587);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            // Read greeting
+            reader.readLine();
 
-            if (response.statusCode() == 200 || response.statusCode() == 201) {
-                System.out.println("[EMAIL] OTP enviado a " + email);
-                return true;
-            } else {
-                System.err.println("[EMAIL] Error Resend " + response.statusCode() + ": " + response.body());
-                return false;
-            }
+            // EHLO
+            writer.write("EHLO deliciasdepam.com\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // STARTTLS
+            writer.write("STARTTLS\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // Re-negotiate after STARTTLS
+            writer.write("EHLO deliciasdepam.com\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // AUTH LOGIN
+            writer.write("AUTH LOGIN\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // Username
+            writer.write(Base64.getEncoder().encodeToString(GMAIL_USER.getBytes()) + "\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // Password
+            writer.write(Base64.getEncoder().encodeToString(GMAIL_APP_PASSWORD.getBytes()) + "\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // MAIL FROM
+            writer.write("MAIL FROM:<" + GMAIL_USER + ">\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // RCPT TO
+            writer.write("RCPT TO:<" + email + ">\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // DATA
+            writer.write("DATA\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // Email content
+            writer.write("From: Delicias de Pam <" + GMAIL_USER + ">\r\n");
+            writer.write("To: <" + email + ">\r\n");
+            writer.write("Subject:=?UTF-8?B?" + Base64.getEncoder().encodeToString("Tu código de verificación - Delicias de Pam".getBytes("UTF-8")) + "?=\r\n");
+            writer.write("MIME-Version: 1.0\r\n");
+            writer.write("Content-Type: text/html; charset=UTF-8\r\n");
+            writer.write("\r\n");
+            writer.write(htmlBody + "\r\n");
+            writer.write(".\r\n");
+            writer.flush();
+            readAll(reader);
+
+            // QUIT
+            writer.write("QUIT\r\n");
+            writer.flush();
+            readAll(reader);
+
+            writer.close();
+            reader.close();
+            socket.close();
+
+            System.out.println("[EMAIL] OTP enviado a " + email);
+            return true;
+
         } catch (Exception e) {
             System.err.println("[EMAIL] Error enviando: " + e.getMessage());
             return false;
         }
     }
 
-    private static String escaparJson(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+    private static void readAll(BufferedReader reader) throws IOException {
+        while (reader.ready()) {
+            reader.readLine();
+        }
     }
 }
