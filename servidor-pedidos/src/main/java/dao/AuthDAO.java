@@ -137,20 +137,53 @@ public class AuthDAO {
         return null;
     }
 
-    // Eliminar cliente
+    // Eliminar cliente y sus pedidos
     public boolean eliminarCliente(String email) {
-        String sql = "DELETE FROM clientes WHERE email = ?";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            conn.setAutoCommit(false);
+
+            // Primero obtener el teléfono del cliente
+            String tel = null;
+            try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM clientes WHERE email = ?")) {
                 ps.setString(1, email);
-                return ps.executeUpdate() > 0;
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) tel = rs.getString("id");
+                }
             }
+
+            // Eliminar pedidos del cliente
+            if (tel != null) {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM pedidos WHERE telefono = ?")) {
+                    ps.setString(1, tel);
+                    ps.executeUpdate();
+                }
+            }
+
+            // Eliminar OTP codes
+            try (PreparedStatement ps = conn.prepareStatement("DELETE FROM otp_codes WHERE email = ?")) {
+                ps.setString(1, email);
+                ps.executeUpdate();
+            }
+
+            // Eliminar cliente
+            int deleted;
+            try (PreparedStatement ps = conn.prepareStatement("DELETE FROM clientes WHERE email = ?")) {
+                ps.setString(1, email);
+                deleted = ps.executeUpdate();
+            }
+
+            conn.commit();
+            return deleted > 0;
         } catch (SQLException e) {
             System.err.println("[AuthDAO] eliminarCliente: " + e.getMessage());
+            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
         } finally {
-            if (conn != null) Conexion.devolver(conn);
+            if (conn != null) {
+                try { conn.setAutoCommit(true); } catch (SQLException ex) {}
+                Conexion.devolver(conn);
+            }
         }
         return false;
     }
