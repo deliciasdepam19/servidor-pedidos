@@ -1,7 +1,9 @@
 package server;
 
+import javax.net.ssl.*;
 import java.io.*;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.util.Base64;
 
 public class EmailService {
@@ -31,70 +33,79 @@ public class EmailService {
                 + "</div></body></html>";
 
         try {
-            Socket socket = new Socket("smtp.gmail.com", 587);
-            socket.setSoTimeout(15000); // 15 segundos timeout
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            // Conectar a SMTP
+            Socket plainSocket = new Socket("smtp.gmail.com", 587);
+            plainSocket.setSoTimeout(15000);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(plainSocket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(plainSocket.getOutputStream()));
 
-            // Read greeting
-            String line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            // Leer greeting
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             // EHLO
             writer.write("EHLO deliciasdepam.com\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             // STARTTLS
             writer.write("STARTTLS\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
-            // Re-negotiate after STARTTLS
+            // Envolver con SSL
+            SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            SSLSocket sslSocket = (SSLSocket) factory.createSocket(
+                    plainSocket,
+                    plainSocket.getInetAddress().getHostAddress(),
+                    plainSocket.getPort(),
+                    true
+            );
+            sslSocket.startHandshake();
+
+            // Re-negociar después de TLS
+            reader = new BufferedReader(new InputStreamReader(sslSocket.getInputStream()));
+            writer = new BufferedWriter(new OutputStreamWriter(sslSocket.getOutputStream()));
+
+            // EHLO de nuevo
             writer.write("EHLO deliciasdepam.com\r\n");
             writer.flush();
-            line = reader.readLine();
+            String line;
+            while ((line = reader.readLine()) != null && line.startsWith("250-")) {
+                System.out.println("[EMAIL] S: " + line);
+            }
             System.out.println("[EMAIL] S: " + line);
 
             // AUTH LOGIN
             writer.write("AUTH LOGIN\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             // Username
             writer.write(Base64.getEncoder().encodeToString(GMAIL_USER.getBytes()) + "\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             // Password
             writer.write(Base64.getEncoder().encodeToString(GMAIL_APP_PASSWORD.getBytes()) + "\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             // MAIL FROM
             writer.write("MAIL FROM:<" + GMAIL_USER + ">\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             // RCPT TO
             writer.write("RCPT TO:<" + email + ">\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             // DATA
             writer.write("DATA\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
-            // Email content
+            // Contenido del email
             writer.write("From: Delicias de Pam <" + GMAIL_USER + ">\r\n");
             writer.write("To: <" + email + ">\r\n");
             writer.write("Subject:=?UTF-8?B?" + Base64.getEncoder().encodeToString("Tu código de verificación - Delicias de Pam".getBytes("UTF-8")) + "?=\r\n");
@@ -104,24 +115,23 @@ public class EmailService {
             writer.write(htmlBody + "\r\n");
             writer.write(".\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             // QUIT
             writer.write("QUIT\r\n");
             writer.flush();
-            line = reader.readLine();
-            System.out.println("[EMAIL] S: " + line);
+            System.out.println("[EMAIL] S: " + reader.readLine());
 
             writer.close();
             reader.close();
-            socket.close();
+            sslSocket.close();
 
             System.out.println("[EMAIL] OTP enviado a " + email);
             return true;
 
         } catch (Exception e) {
-            System.err.println("[EMAIL] Error enviando: " + e.getMessage());
+            System.err.println("[EMAIL] Error: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
