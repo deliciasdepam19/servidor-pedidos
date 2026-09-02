@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 import dao.AdminDAO;
 import dao.DispositivoDAO;
 import dao.NotificacionDAO;
+import dao.InvitacionDAO;
 import dao.AuthDAO;
 import dao.InventarioDAO;
 import dao.PedidosDAO;
@@ -46,6 +47,7 @@ public class PedidosServer {
     private final AdminDAO adminDAO = new AdminDAO();
     private final DispositivoDAO dispositivoDAO = new DispositivoDAO();
     private final NotificacionDAO notificacionDAO = new NotificacionDAO();
+    private final InvitacionDAO invitacionDAO = new InvitacionDAO();
     private final AuthDAO authDAO = new AuthDAO();
 
     private final Object pedidoLock = new Object();
@@ -741,6 +743,120 @@ servidor.createContext("/img/", exchange -> {
                 } catch (Exception e) {
                     e.printStackTrace();
                     enviarRespuesta(exchange, 500, "{\"error\":\"Error\"}");
+                }
+            }
+        });
+
+        // ── Invitaciones: códigos de acceso VIP ────────────────────────
+        servidor.createContext("/api/invitaciones/validar", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String codigo = extraerValor(body, "codigo");
+                    if ("-".equals(codigo) || codigo.isBlank()) {
+                        enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"Código requerido\"}");
+                        return;
+                    }
+                    boolean valido = invitacionDAO.validar(codigo);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + valido + "}");
+                } catch (Exception e) {
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
+        servidor.createContext("/api/invitaciones/registrar", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String codigo = extraerValor(body, "codigo");
+                    String telefono = extraerValor(body, "telefono");
+                    if ("-".equals(codigo) || "-".equals(telefono)) {
+                        enviarRespuesta(exchange, 400, "{\"exito\":false}");
+                        return;
+                    }
+                    boolean ok = invitacionDAO.marcarUsado(codigo, telefono);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
+                } catch (Exception e) {
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
+        servidor.createContext("/api/invitaciones/generar", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String codigo = invitacionDAO.generar();
+                    enviarRespuesta(exchange, 200, "{\"exito\":true,\"codigo\":\"" + codigo + "\"}");
+                } catch (Exception e) {
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
+        servidor.createContext("/api/invitaciones/listar", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("GET".equals(exchange.getRequestMethod())) {
+                try {
+                    var lista = invitacionDAO.listar();
+                    StringBuilder json = new StringBuilder("[");
+                    for (int i = 0; i < lista.size(); i++) {
+                        var row = lista.get(i);
+                        json.append("{");
+                        json.append("\"id\":").append(row.get("id")).append(",");
+                        json.append("\"codigo\":\"").append(row.get("codigo")).append("\",");
+                        json.append("\"activo\":").append(row.get("activo")).append(",");
+                        json.append("\"used_by\":\"").append(row.get("used_by") != null ? row.get("used_by") : "").append("\",");
+                        json.append("\"created_at\":\"").append(row.get("created_at")).append("\",");
+                        json.append("\"used_at\":\"").append(row.get("used_at") != null ? row.get("used_at") : "").append("\"");
+                        json.append("}");
+                        if (i < lista.size() - 1) json.append(",");
+                    }
+                    json.append("]");
+                    exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+                    byte[] b = json.toString().getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, b.length);
+                    exchange.getResponseBody().write(b);
+                    exchange.close();
+                } catch (Exception e) {
+                    enviarRespuesta(exchange, 500, "{\"error\":\"Error\"}");
+                }
+            }
+        });
+
+        servidor.createContext("/api/invitaciones/revocar", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String codigo = extraerValor(body, "codigo");
+                    boolean ok = invitacionDAO.revocar(codigo);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
+                } catch (Exception e) {
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
                 }
             }
         });
