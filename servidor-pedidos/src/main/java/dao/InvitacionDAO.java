@@ -79,7 +79,7 @@ public class InvitacionDAO {
 
     public java.util.List<java.util.Map<String, Object>> listar() {
         java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
-        String sql = "SELECT id, codigo, activo, used_by, created_at, used_at FROM invitaciones ORDER BY id DESC";
+        String sql = "SELECT id, codigo, activo, used_by, created_at, used_at FROM invitaciones ORDER BY id ASC";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
