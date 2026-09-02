@@ -894,7 +894,10 @@ servidor.createContext("/img/", exchange -> {
                     String plataforma = extraerValor(body, "plataforma");
                     if ("-".equals(plataforma) || plataforma.isBlank()) plataforma = "android";
 
+                    System.out.println("[DISPOSITIVOS] registrar: tel=" + telefono + " token=" + (token != null ? token.substring(0, Math.min(30, token.length())) : "null") + " platform=" + plataforma);
+
                     if ("-".equals(telefono) || "-".equals(token)) {
+                        System.out.println("[DISPOSITIVOS] Faltan campos: tel=" + telefono + " token=" + token);
                         enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"Faltan campos\"}");
                         return;
                     }
@@ -926,6 +929,18 @@ servidor.createContext("/img/", exchange -> {
                     System.err.println("[DISPOSITIVOS] eliminar: " + e.getMessage());
                     enviarRespuesta(exchange, 500, "{\"exito\":false}");
                 }
+            }
+        });
+
+        servidor.createContext("/api/dispositivos/estado", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("GET".equals(exchange.getRequestMethod())) {
+                int total = dispositivoDAO.contarActivos();
+                enviarRespuesta(exchange, 200, "{\"dispositivos_activos\":" + total + "}");
             }
         });
 

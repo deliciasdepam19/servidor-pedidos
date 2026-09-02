@@ -78,6 +78,23 @@ public class DispositivoDAO {
         return tokens;
     }
 
+    public int contarActivos() {
+        String sql = "SELECT COUNT(*) FROM dispositivos WHERE activo = true";
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("[DispositivoDAO] contarActivos: " + e.getMessage());
+        } finally {
+            if (conn != null) Conexion.devolver(conn);
+        }
+        return 0;
+    }
+
     public void limpiarTokensInvalidos(List<String> tokensInvalidos) {
         if (tokensInvalidos == null || tokensInvalidos.isEmpty()) return;
         String sql = "UPDATE dispositivos SET activo = false "
