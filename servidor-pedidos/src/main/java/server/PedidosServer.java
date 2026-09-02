@@ -861,6 +861,24 @@ servidor.createContext("/img/", exchange -> {
             }
         });
 
+        servidor.createContext("/api/invitaciones/eliminar", exchange -> {
+            agregarCorsHeaders(exchange);
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    String codigo = extraerValor(body, "codigo");
+                    boolean ok = invitacionDAO.eliminar(codigo);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
+                } catch (Exception e) {
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
+                }
+            }
+        });
+
         // ── Dispositivos: registro de push tokens ────────────────────────
         servidor.createContext("/api/dispositivos/registrar", exchange -> {
             agregarCorsHeaders(exchange);

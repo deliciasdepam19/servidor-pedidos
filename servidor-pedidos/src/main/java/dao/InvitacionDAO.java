@@ -77,6 +77,23 @@ public class InvitacionDAO {
         return false;
     }
 
+    public boolean eliminar(String codigo) {
+        String sql = "DELETE FROM invitaciones WHERE codigo = ?";
+        Connection conn = null;
+        try {
+            conn = Conexion.conectar();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, codigo.toUpperCase().trim());
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            System.err.println("[InvitacionDAO] eliminar: " + e.getMessage());
+        } finally {
+            if (conn != null) Conexion.devolver(conn);
+        }
+        return false;
+    }
+
     public java.util.List<java.util.Map<String, Object>> listar() {
         java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
         String sql = "SELECT id, codigo, activo, used_by, created_at, used_at FROM invitaciones ORDER BY id ASC";
