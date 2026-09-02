@@ -1538,7 +1538,9 @@ servidor.createContext("/img/", exchange -> {
                 + "\"data\":" + dataJson.toString() + ","
                 + "\"sound\":\"default\","
                 + "\"channelId\":\"pedidos\","
-                + "\"priority\":\"high\""
+                + "\"priority\":\"high\","
+                + "\"_displayInForeground\":true,"
+                + "\"badge\":1"
                 + "}";
 
         HttpRequest request = HttpRequest.newBuilder()
