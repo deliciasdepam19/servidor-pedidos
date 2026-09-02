@@ -7,14 +7,22 @@ import java.util.List;
 public class DispositivoDAO {
 
     public boolean registrar(String telefono, String expoPushToken, String plataforma) {
-        String sql = "INSERT INTO dispositivos (telefono, expo_push_token, plataforma) "
-                + "VALUES (?, ?, ?) "
-                + "ON CONFLICT (telefono, expo_push_token) DO UPDATE SET "
-                + "activo = true, plataforma = EXCLUDED.plataforma";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            // 1. Desactivar tokens viejos de este teléfono (Expo Go, etc.)
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE dispositivos SET activo = false WHERE telefono = ? AND expo_push_token != ?")) {
+                ps.setString(1, telefono);
+                ps.setString(2, expoPushToken);
+                ps.executeUpdate();
+            }
+            // 2. Insertar o activar el token nuevo
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO dispositivos (telefono, expo_push_token, plataforma) "
+                    + "VALUES (?, ?, ?) "
+                    + "ON CONFLICT (telefono, expo_push_token) DO UPDATE SET "
+                    + "activo = true, plataforma = EXCLUDED.plataforma")) {
                 ps.setString(1, telefono);
                 ps.setString(2, expoPushToken);
                 ps.setString(3, plataforma != null ? plataforma : "android");
