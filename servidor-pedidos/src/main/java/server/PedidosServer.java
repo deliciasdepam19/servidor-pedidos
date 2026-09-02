@@ -1594,15 +1594,12 @@ servidor.createContext("/img/", exchange -> {
                 try {
                     boolean ok = enviarExpoPush(token, titulo, mensaje,
                             Map.of("type", "aviso", "titulo", titulo));
-                    if (!ok) tokensInvalidos.add(token);
+                    if (!ok) {
+                        System.out.println("[PUSH-NOTIF] Push falló para token: " + token.substring(0, Math.min(30, token.length())) + "... (no se limpia aún)");
+                    }
                 } catch (Exception e) {
                     System.err.println("[PUSH-NOTIF] Error a " + token + ": " + e.getMessage());
-                    tokensInvalidos.add(token);
                 }
-            }
-
-            if (!tokensInvalidos.isEmpty()) {
-                dispositivoDAO.limpiarTokensInvalidos(tokensInvalidos);
             }
 
             System.out.println("[PUSH-NOTIF] Enviado a " + tokens.size() + " dispositivos");
