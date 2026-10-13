@@ -9,7 +9,9 @@ public class ReporteRapidosDAO {
     public List<String[]> listarReportes() {
         List<String[]> lista = new ArrayList<>();
 
-        String sql = "SELECT fecha, total, total_efectivo, total_transferencia, detalle, detalle_categorias "
+        String sql = "SELECT fecha, total, total_efectivo, total_transferencia, detalle, detalle_categorias, "
+                + "COALESCE(total_debito, 0) AS total_debito, "
+                + "COALESCE(total_credito, 0) AS total_credito "
                 + "FROM reportes "
                 + "WHERE fecha::date >= CURRENT_DATE - INTERVAL '3 months' "
                 + "AND NOT (detalle = 'Cierre manual BD') "
@@ -33,6 +35,8 @@ public class ReporteRapidosDAO {
                 double totalDia = rs.getDouble("total");
                 double totalEfec = rs.getDouble("total_efectivo");
                 double totalTransf = rs.getDouble("total_transferencia");
+                double totalDebito = rs.getDouble("total_debito");
+                double totalCredito = rs.getDouble("total_credito");
 
                 String detalleRap = filtrarDetalleRapidos(detalleCompleto, conn);
                 String masVendido = extraerMasVendido(detalleRap);
@@ -41,6 +45,8 @@ public class ReporteRapidosDAO {
                 double proporcion = totalDia > 0 ? totalRap / totalDia : 0.0;
                 double efecRap = Math.round(totalEfec * proporcion);
                 double transfRap = Math.round(totalTransf * proporcion);
+                double debRap = Math.round(totalDebito * proporcion);
+                double credRap = Math.round(totalCredito * proporcion);
 
                 String fechaStr = rs.getString("fecha");
                 if (fechaStr != null && fechaStr.length() >= 10) {
@@ -53,7 +59,9 @@ public class ReporteRapidosDAO {
                     String.format("%.0f", efecRap),
                     String.format("%.0f", transfRap),
                     detalleRap,
-                    masVendido
+                    masVendido,
+                    String.format("%.0f", debRap),
+                    String.format("%.0f", credRap)
                 });
             }
             rs.close();
