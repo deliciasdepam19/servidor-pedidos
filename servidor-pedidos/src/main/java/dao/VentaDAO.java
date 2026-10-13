@@ -49,6 +49,14 @@ public class VentaDAO {
         return totalDelDiaPorTipo(fecha, "TRANSFERENCIA");
     }
 
+    public double totalDebitoDelDia(String fecha) {
+        return totalDelDiaPorTipo(fecha, "DEBITO");
+    }
+
+    public double totalCreditoDelDia(String fecha) {
+        return totalDelDiaPorTipo(fecha, "CREDITO");
+    }
+
     private double totalDelDiaPorTipo(String fecha, String tipoPago) {
         Connection conn = null;
         try {
@@ -121,7 +129,7 @@ public class VentaDAO {
                     + "FROM ventas_rapidas vr "
                     + "LEFT JOIN ventas v ON v.id = vr.grupo_venta_id "
                     + "WHERE vr.fecha::date = ? "
-                    + "AND (vr.tipo_pago != 'PENDIENTE' OR v.tipo_pago != 'PENDIENTE') "
+                    + "AND (vr.tipo_pago != 'PENDIENTE' OR v.tipo_pago IS NOT NULL AND v.tipo_pago != 'PENDIENTE') "
                     + "GROUP BY vr.nombre")) {
 
                 ps.setDate(1, sqlFecha);
@@ -310,7 +318,9 @@ public class VentaDAO {
             RecetaDAO recetaDAO = new RecetaDAO();
             InventarioDAO invDAO = new InventarioDAO();
 
-            if (!items.isEmpty()) {
+            // SIEMPRE crear fila en ventas (incluso si solo hay rapidos)
+            // para que todos los productos compartan un grupo_venta_id
+            if (!items.isEmpty() || (rapidosCant != null && !rapidosCant.isEmpty())) {
                 try (PreparedStatement psVenta = conn.prepareStatement(
                         "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente, origen) VALUES (?, ?, ?, ?, ?)",
                         Statement.RETURN_GENERATED_KEYS)) {
@@ -328,7 +338,9 @@ public class VentaDAO {
                         ventaId = keys.getInt(1);
                     }
                 }
+            }
 
+            if (!items.isEmpty()) {
                 for (Map.Entry<Integer, Integer> entry : items.entrySet()) {
                     int id = entry.getKey();
                     int cantidad = entry.getValue();
@@ -493,31 +505,21 @@ public class VentaDAO {
             }
 
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT vr.nombre, SUM(vr.cantidad) as total, "
-                    + "ci.categoria as carta_categoria "
-                    + "FROM ventas_rapidas vr "
+                    "SELECT vr.nombre, SUM(vr.cantidad) as total FROM ventas_rapidas vr "
                     + "LEFT JOIN ventas v ON v.id = vr.grupo_venta_id "
-                    + "LEFT JOIN carta_items ci ON LOWER(TRIM(ci.nombre)) = LOWER(TRIM(vr.nombre)) "
                     + "WHERE vr.fecha::date = ? "
                     + "AND (vr.tipo_pago != 'PENDIENTE' OR v.tipo_pago IS NULL OR v.tipo_pago != 'PENDIENTE') "
-                    + "GROUP BY vr.nombre, ci.categoria")) {
+                    + "GROUP BY vr.nombre")) {
                 ps.setDate(1, sqlFecha);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         String nombre = rs.getString("nombre");
                         int total = rs.getInt("total");
-                        String cartaCat = rs.getString("carta_categoria");
                         if (nombre != null) {
                             String n = nombre.toLowerCase().trim();
-                            String catNorm = cartaCat != null
-                                    ? java.text.Normalizer.normalize(cartaCat, java.text.Normalizer.Form.NFD)
-                                            .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
-                                            .toLowerCase().trim()
-                                    : "";
-                            if (catNorm.contains("empanada")
-                                    || n.contains("empanada") || n.contains("arma")) {
+                            if (n.contains("empanada") || n.contains("arma")) {
                                 result[0] += total;
-                            } else if (catNorm.contains("sopaipilla") || n.contains("sopaipilla")) {
+                            } else if (n.contains("sopaipilla")) {
                                 result[1] += total;
                             } else {
                                 result[2] += total;
@@ -683,6 +685,8 @@ public class VentaDAO {
     public int guardarReporteYReiniciar(
             double total,
             double totalEfectivo,
+            double totalDebito,
+            double totalCredito,
             double totalTransferencia,
             Map<String, Integer> resumen,
             String usuario,
@@ -728,7 +732,9 @@ public class VentaDAO {
             int pedidosLocal = contarVentasLocal(fecha);
             int pedidosApp = contarVentasApp(fecha);
 
-            double liquidadoEfectivo = 0;
+                        double liquidadoEfectivo = 0;
+            double liquidadoDebito = 0;
+            double liquidadoCredito = 0;
             double liquidadoTransferencia = 0;
 
             try (PreparedStatement psLiq = conn.prepareStatement(
@@ -743,34 +749,39 @@ public class VentaDAO {
                     double monto = rsLiq.getDouble(1);
                     if ("EFECTIVO".equals(tipo)) {
                         liquidadoEfectivo += monto;
+                    } else if ("DEBITO".equals(tipo)) {
+                        liquidadoDebito += monto;
+                    } else if ("CREDITO".equals(tipo)) {
+                        liquidadoCredito += monto;
                     } else if ("TRANSFERENCIA".equals(tipo)) {
                         liquidadoTransferencia += monto;
                     }
                 }
             }
 
-            // ── INSERT reporte ────────────────────────────────────────────────
             try (PreparedStatement psReporte = conn.prepareStatement(
-                    "INSERT INTO reportes (fecha, total, total_efectivo, total_transferencia, "
+                    "INSERT INTO reportes (fecha, total, total_efectivo, total_transferencia, total_debito, total_credito, "
                     + "total_pendiente, generado_por, detalle, pedidos_web, pedidos_local, pedidos_app, detalle_categorias, gastos) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
 
                 psReporte.setDate(1, java.sql.Date.valueOf(fecha));
-                psReporte.setDouble(2, total + liquidadoEfectivo + liquidadoTransferencia);
+                psReporte.setDouble(2, total + liquidadoEfectivo + liquidadoDebito + liquidadoCredito + liquidadoTransferencia);
                 psReporte.setDouble(3, totalEfectivo + liquidadoEfectivo);
                 psReporte.setDouble(4, totalTransferencia + liquidadoTransferencia);
-                psReporte.setDouble(5, pendiente);
-                psReporte.setString(6, usuario);
-                psReporte.setString(7, detalleStr.toString());
-                psReporte.setInt(8, pedidosWeb);
-                psReporte.setInt(9, pedidosLocal);
-                psReporte.setInt(10, pedidosApp);
-                psReporte.setString(11, detalleCats.toString());
-                psReporte.setDouble(12, gastos);   // ← usa el parámetro
+                psReporte.setDouble(5, totalDebito + liquidadoDebito);
+                psReporte.setDouble(6, totalCredito + liquidadoCredito);
+                psReporte.setDouble(7, pendiente);
+                psReporte.setString(8, usuario);
+                psReporte.setString(9, detalleStr.toString());
+                psReporte.setInt(10, pedidosWeb);
+                psReporte.setInt(11, pedidosLocal);
+                psReporte.setInt(12, pedidosApp);
+                psReporte.setString(13, detalleCats.toString());
+                psReporte.setDouble(14, gastos);
                 psReporte.executeUpdate();
             }
 
-            // ── Eliminar ventas del día ───────────────────────────────────────
+            // Eliminar ventas del día ───────────────────────────────────────
             try (PreparedStatement psDel1 = conn.prepareStatement(
                     "DELETE FROM detalle_ventas WHERE venta_id IN "
                     + "(SELECT id FROM ventas WHERE fecha::date = ? AND tipo_pago != 'PENDIENTE')")) {
@@ -1013,8 +1024,7 @@ public class VentaDAO {
             Map<String, Double> precios,
             Map<String, Integer> ids,
             String tipoPago,
-            String nombreCliente,
-            String origen) {
+            String nombreCliente) {
 
         Connection conn = null;
         try {
@@ -1034,7 +1044,9 @@ public class VentaDAO {
 
             boolean tieneConId = ids.values().stream().anyMatch(id -> id != null && id > 0);
 
-            if (tieneConId) {
+            // SIEMPRE crear fila en ventas (incluso si solo hay rapidos)
+            // para que todos los productos compartan un grupo_venta_id
+            if (tieneConId || !carrito.isEmpty()) {
                 try (PreparedStatement ps = conn.prepareStatement(
                         "INSERT INTO ventas (fecha, total, tipo_pago, nombre_cliente, origen) VALUES (?, ?, ?, ?, ?)",
                         Statement.RETURN_GENERATED_KEYS)) {
@@ -1042,7 +1054,7 @@ public class VentaDAO {
                     ps.setDouble(2, totalVenta);
                     ps.setString(3, tipoPago);
                     ps.setString(4, nombreCliente);
-                    ps.setString(5, origen != null ? origen : "LOCAL");
+                    ps.setString(5, "LOCAL");
                     ps.executeUpdate();
                     try (ResultSet keys = ps.getGeneratedKeys()) {
                         if (!keys.next()) {
@@ -1052,7 +1064,9 @@ public class VentaDAO {
                         ventaId = keys.getInt(1);
                     }
                 }
+            }
 
+            if (tieneConId) {
                 for (Map.Entry<String, Integer> entry : carrito.entrySet()) {
                     String key = entry.getKey();
                     Integer prodId = ids.get(key);
