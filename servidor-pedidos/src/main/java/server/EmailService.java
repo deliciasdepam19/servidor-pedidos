@@ -24,20 +24,52 @@ public class EmailService {
             return false;
         }
 
-        String htmlBody = "<!DOCTYPE html>"
-                + "<html><head><style>"
-                + "body{font-family:Arial,sans-serif;background:#09100f;color:#e0eff1;text-align:center;padding:40px;}"
-                + ".card{background:#101a1c;border-radius:16px;border:1px solid rgba(64,206,224,0.15);padding:32px;max-width:400px;margin:0 auto;}"
-                + ".code{font-size:48px;font-weight:800;color:#40cee0;letter-spacing:12px;margin:24px 0;}"
-                + ".footer{color:#6a8f96;font-size:12px;margin-top:24px;}"
-                + "</style></head><body>"
-                + "<div class='card'>"
-                + "<h2 style='color:#40cee0;'>Delicias de Pam</h2>"
-                + "<p>Tu código de verificación es:</p>"
-                + "<div class='code'>" + codigo + "</div>"
-                + "<p style='color:#6a8f96;'>Este código expira en 5 minutos.</p>"
-                + "<p class='footer'>Si no solicitaste este código, puedes ignorar este mensaje.</p>"
-                + "</div></body></html>";
+        String htmlBody = """
+                <div style="font-family: system-ui, sans-serif, Arial; font-size: 12px">
+                  <div style="text-align: center; margin-bottom: 15px;">
+                    <img
+                      src="https://i.imgur.com/X4ja4OO.png"
+                      alt="Delicias de Pam"
+                      width="80"
+                      style="display: block; margin: 0 auto;"
+                    />
+                  </div>
+                  <div style="font-size: 16px; color: #2c3e50; text-align: center;">
+                    Tu código de verificación para acceder a nuestra app
+                  </div>
+                  <div
+                    style="
+                      margin-top: 20px;
+                      padding: 15px 0;
+                      border-width: 1px 0;
+                      border-style: dashed;
+                      border-color: lightgrey;
+                      text-align: center;
+                    "
+                  >
+                    <div style="color: #2c3e50; font-size: 14px; margin-bottom: 10px;">
+                      Usa el siguiente código para completar tu verificación:
+                    </div>
+                    <div
+                      style="
+                        display: inline-block;
+                        padding: 10px 20px;
+                        background-color: aliceblue;
+                        border-radius: 5px;
+                        font-size: 28px;
+                        font-weight: bold;
+                        letter-spacing: 4px;
+                        color: #2c3e50;
+                      "
+                    >
+                      %s
+                    </div>
+                    <p style="font-size: 13px; color: #888; margin-top: 15px;">
+                      Este código vence en 5 minutos. Si no lo solicitaste, puedes ignorar este mensaje.
+                    </p>
+                  </div>
+                </div>
+                """.formatted(codigo);
 
         String payload = String.format("""
                 {
