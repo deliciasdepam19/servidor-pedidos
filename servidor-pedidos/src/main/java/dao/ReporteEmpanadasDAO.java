@@ -9,7 +9,9 @@ public class ReporteEmpanadasDAO {
     public List<String[]> listarReportes() {
         List<String[]> lista = new ArrayList<>();
 
-        String sql = "SELECT fecha, total, total_efectivo, total_transferencia, detalle, detalle_categorias "
+        String sql = "SELECT fecha, total, total_efectivo, total_transferencia, detalle, detalle_categorias, "
+                + "COALESCE(total_debito, 0) AS total_debito, "
+                + "COALESCE(total_credito, 0) AS total_credito "
                 + "FROM reportes "
                 + "WHERE fecha::date >= CURRENT_DATE - INTERVAL '3 months' "
                 + "AND NOT (detalle = 'Cierre manual BD') "
@@ -33,14 +35,18 @@ public class ReporteEmpanadasDAO {
                 double totalDia = rs.getDouble("total");
                 double totalEfec = rs.getDouble("total_efectivo");
                 double totalTransf = rs.getDouble("total_transferencia");
+                double totalDebito = rs.getDouble("total_debito");
+                double totalCredito = rs.getDouble("total_credito");
 
-                String detalleEmp = filtrarDetalleEmpanadas(detalleCompleto);
+                String detalleEmp = filtrarDetalleEmpanadas(detalleCompleto, conn);
                 String masVendida = extraerMasVendida(detalleEmp);
 
                 double totalEmp = calcularTotalDesdeDetalle(detalleEmp, conn);
                 double proporcion = totalDia > 0 ? totalEmp / totalDia : 0.0;
                 double efecEmp = Math.round(totalEfec * proporcion);
                 double transfEmp = Math.round(totalTransf * proporcion);
+                double debEmp = Math.round(totalDebito * proporcion);
+                double credEmp = Math.round(totalCredito * proporcion);
 
                 String fechaStr = rs.getString("fecha");
                 if (fechaStr != null && fechaStr.length() >= 10) {
@@ -53,7 +59,9 @@ public class ReporteEmpanadasDAO {
                     String.format("%.0f", efecEmp),
                     String.format("%.0f", transfEmp),
                     detalleEmp,
-                    masVendida
+                    masVendida,
+                    String.format("%.0f", debEmp),
+                    String.format("%.0f", credEmp)
                 });
             }
             rs.close();
@@ -87,7 +95,7 @@ public class ReporteEmpanadasDAO {
         return 0;
     }
 
-    private String filtrarDetalleEmpanadas(String detalle) {
+    private String filtrarDetalleEmpanadas(String detalle, Connection conn) {
         if (detalle == null || detalle.isBlank()) {
             return "";
         }
@@ -98,7 +106,32 @@ public class ReporteEmpanadasDAO {
                 continue;
             }
             String nombreLower = t.toLowerCase();
-            if (nombreLower.startsWith("empanada")) {
+            String nombreProd = t.contains(":") ? t.split(":")[0].trim().toLowerCase() : nombreLower;
+            boolean esEmpanada = nombreLower.startsWith("empanada")
+                    || nombreLower.contains("arma tu empanada");
+            if (!esEmpanada && conn != null) {
+                try {
+                    PreparedStatement ps = conn.prepareStatement(
+                            "SELECT categoria FROM carta_items WHERE LOWER(TRIM(nombre)) = ? LIMIT 1");
+                    ps.setString(1, nombreProd);
+                    ResultSet rs = ps.executeQuery();
+                    if (rs.next()) {
+                        String cat = rs.getString("categoria");
+                        if (cat != null && cat.toLowerCase().contains("empanada")) {
+                            esEmpanada = true;
+                        }
+                    }
+                    rs.close();
+                    ps.close();
+                } catch (SQLException e) {
+                    // ignore — fall back to name matching
+                }
+            }
+            if (esEmpanada) {
+                // Limpiar prefijo "Empanada " para que parsearDetalle pueda mergear "Arma tu Empanada"
+                if (nombreLower.startsWith("empanada ") && nombreLower.contains("arma tu empanada")) {
+                    t = t.replaceFirst("(?i)^Empanada\\s+", "");
+                }
                 sb.append(t).append("|");
             }
         }
@@ -140,12 +173,19 @@ public class ReporteEmpanadasDAO {
             }
 
             String nombreSinPrefijo = nombre.replaceAll("(?i)^empanada\\s*", "").trim();
+            boolean esArma = nombre.toLowerCase().contains("arma tu empanada");
 
             try {
-                PreparedStatement ps = conn.prepareStatement(
-                        "SELECT precio FROM empanadas WHERE LOWER(tipo) = LOWER(?) OR LOWER(tipo) = LOWER(?) LIMIT 1");
-                ps.setString(1, nombre);
-                ps.setString(2, nombreSinPrefijo);
+                PreparedStatement ps;
+                if (esArma) {
+                    ps = conn.prepareStatement(
+                            "SELECT precio FROM carta_items WHERE LOWER(nombre) LIKE '%arma%empanada%' LIMIT 1");
+                } else {
+                    ps = conn.prepareStatement(
+                            "SELECT precio FROM empanadas WHERE LOWER(tipo) = LOWER(?) OR LOWER(tipo) = LOWER(?) LIMIT 1");
+                    ps.setString(1, nombre);
+                    ps.setString(2, nombreSinPrefijo);
+                }
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     total += rs.getDouble("precio") * cantidad;
