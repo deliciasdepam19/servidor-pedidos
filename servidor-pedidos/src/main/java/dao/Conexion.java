@@ -14,15 +14,9 @@ public class Conexion {
     public static final String REPORTES_RAPIDOS_TXT = "C:/DeliciasPam/Reportes/Reportes Prod.Rapidos/TXT/";
     public static final String REPORTES_RAPIDOS_EXCEL = "G:/Mi unidad/Reportes/Reportes Prod.Rapidos/excel";
 
-    // Opcional: en el servidor (Render) no hace falta. Si existe la variable
-    // de entorno URL_SERVIDOR o la clave url.servidor en config.properties, se usa.
+
     public static final String SERVER_URL = getConfigOpcional("url.servidor", "");
 
-    /**
-     * Busca la clave en: 1) variable de entorno con el mismo nombre,
-     * 2) variable de entorno en MAYUSCULAS con "_" en vez de "." (ej: URL_SERVIDOR),
-     * 3) config.properties. Devuelve null si no la encuentra en ninguna parte.
-     */
     private static String leerConfig(String key) {
         String env = System.getenv(key);
         if (env != null && !env.isBlank()) {
@@ -36,7 +30,7 @@ public class Conexion {
 
         try {
             return Config.get(key);
-        } catch (Throwable t) { // incluye ExceptionInInitializerError
+        } catch (Throwable t) {
             return null;
         }
     }
