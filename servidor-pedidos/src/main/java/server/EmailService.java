@@ -1,17 +1,26 @@
 package server;
 
-import jakarta.mail.*;
-import jakarta.mail.internet.*;
-import java.util.Properties;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 public class EmailService {
 
-    private static final String GMAIL_USER = System.getenv("GMAIL_USER");
-    private static final String GMAIL_APP_PASSWORD = System.getenv("GMAIL_APP_PASSWORD");
+    private static final String BREVO_API_KEY = System.getenv("BREVO_API_KEY");
+    private static final String SENDER_EMAIL = System.getenv("GMAIL_USER");
+    private static final String SENDER_NAME = "Delicias de Pam";
+    private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 
     public static boolean enviarCodigoOTP(String email, String codigo) {
-        if (GMAIL_USER == null || GMAIL_USER.isBlank() || GMAIL_APP_PASSWORD == null || GMAIL_APP_PASSWORD.isBlank()) {
-            System.err.println("[EMAIL] GMAIL_USER o GMAIL_APP_PASSWORD no configurados");
+        if (BREVO_API_KEY == null || BREVO_API_KEY.isBlank()) {
+            System.err.println("[EMAIL] BREVO_API_KEY no configurado");
+            return false;
+        }
+        if (SENDER_EMAIL == null || SENDER_EMAIL.isBlank()) {
+            System.err.println("[EMAIL] GMAIL_USER (remitente verificado en Brevo) no configurado");
             return false;
         }
 
@@ -30,34 +39,67 @@ public class EmailService {
                 + "<p class='footer'>Si no solicitaste este código, puedes ignorar este mensaje.</p>"
                 + "</div></body></html>";
 
-        Properties props = new Properties();
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.host", "smtp.gmail.com");
-        props.put("mail.smtp.port", "587");
-        props.put("mail.smtp.timeout", "15000");
-        props.put("mail.smtp.connectiontimeout", "15000");
+        String payload = String.format("""
+                {
+                  "sender": {"email": "%s", "name": "%s"},
+                  "to": [{"email": "%s"}],
+                  "subject": "Tu código de verificación - Delicias de Pam",
+                  "htmlContent": "%s"
+                }
+                """, jsonEscape(SENDER_EMAIL), jsonEscape(SENDER_NAME), jsonEscape(email), jsonEscape(htmlBody));
 
-        Session session = Session.getInstance(props, new Authenticator() {
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(GMAIL_USER, GMAIL_APP_PASSWORD);
-            }
-        });
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15))
+                .build();
 
         try {
-            Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(GMAIL_USER, "Delicias de Pam"));
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(email));
-            message.setSubject("Tu código de verificación - Delicias de Pam");
-            message.setContent(htmlBody, "text/html; charset=UTF-8");
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(BREVO_URL))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("api-key", BREVO_API_KEY)
+                    .header("content-type", "application/json")
+                    .header("accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
+                    .build();
 
-            Transport.send(message);
-            System.out.println("[EMAIL] OTP enviado a " + email);
-            return true;
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+
+            if (status >= 200 && status < 300) {
+                System.out.println("[EMAIL] OTP enviado a " + email + " (Brevo HTTP " + status + ")");
+                return true;
+            }
+
+            System.err.println("[EMAIL] Error Brevo HTTP " + status + ": " + response.body());
+            return false;
 
         } catch (Exception e) {
             System.err.println("[EMAIL] Error: " + e.getMessage());
             return false;
         }
+    }
+
+    private static String jsonEscape(String s) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                default -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+            }
+        }
+        return sb.toString();
     }
 }
