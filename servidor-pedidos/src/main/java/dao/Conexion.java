@@ -5,26 +5,53 @@ import java.sql.*;
 import java.util.concurrent.*;
 
 public class Conexion {
-public static final String BASE_PATH = "G:/Mi unidad/";
-public static final String REPORTES_VENTAS_TXT = "C:/DeliciasPam/Reportes/Reportes Ventas/TXT/";
-public static final String REPORTES_VENTAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Ventas/Excel";
-public static final String REPORTES_EMPANADAS_TXT = "C:/DeliciasPam/Reportes/Reportes Empanadas/TXT/";
-public static final String REPORTES_EMPANADAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Empanadas/Excel/";
-public static final String REPORTES_RAPIDOS_TXT = "C:/DeliciasPam/Reportes/Reportes Prod.Rapidos/TXT/";
-public static final String REPORTES_RAPIDOS_EXCEL = "G:/Mi unidad/Reportes/Reportes Prod.Rapidos/excel";
-public static final String SERVER_URL = getConfig("url.servidor");
 
-    private static String getConfig(String key) {
+    public static final String BASE_PATH = "G:/Mi unidad/";
+    public static final String REPORTES_VENTAS_TXT = "C:/DeliciasPam/Reportes/Reportes Ventas/TXT/";
+    public static final String REPORTES_VENTAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Ventas/Excel";
+    public static final String REPORTES_EMPANADAS_TXT = "C:/DeliciasPam/Reportes/Reportes Empanadas/TXT/";
+    public static final String REPORTES_EMPANADAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Empanadas/Excel/";
+    public static final String REPORTES_RAPIDOS_TXT = "C:/DeliciasPam/Reportes/Reportes Prod.Rapidos/TXT/";
+    public static final String REPORTES_RAPIDOS_EXCEL = "G:/Mi unidad/Reportes/Reportes Prod.Rapidos/excel";
+
+    // Opcional: en el servidor (Render) no hace falta. Si existe la variable
+    // de entorno URL_SERVIDOR o la clave url.servidor en config.properties, se usa.
+    public static final String SERVER_URL = getConfigOpcional("url.servidor", "");
+
+    /**
+     * Busca la clave en: 1) variable de entorno con el mismo nombre,
+     * 2) variable de entorno en MAYUSCULAS con "_" en vez de "." (ej: URL_SERVIDOR),
+     * 3) config.properties. Devuelve null si no la encuentra en ninguna parte.
+     */
+    private static String leerConfig(String key) {
         String env = System.getenv(key);
         if (env != null && !env.isBlank()) {
             return env;
         }
 
+        String envAlt = System.getenv(key.toUpperCase().replace('.', '_'));
+        if (envAlt != null && !envAlt.isBlank()) {
+            return envAlt;
+        }
+
         try {
             return Config.get(key);
-        } catch (Exception e) {
+        } catch (Throwable t) { // incluye ExceptionInInitializerError
+            return null;
+        }
+    }
+
+    private static String getConfig(String key) {
+        String v = leerConfig(key);
+        if (v == null) {
             throw new RuntimeException("Falta configuración: " + key);
         }
+        return v;
+    }
+
+    private static String getConfigOpcional(String key, String porDefecto) {
+        String v = leerConfig(key);
+        return v != null ? v : porDefecto;
     }
 
     private static final String POSTGRES_HOST = getConfig("DB_HOST");
