@@ -5,13 +5,14 @@ import java.sql.*;
 import java.util.concurrent.*;
 
 public class Conexion {
-
-    public static final String BASE_PATH = "G:/Mi unidad/";
-    public static final String REPORTES_VENTAS_TXT = "C:/DeliciasPam/Reportes/Reportes Ventas/TXT/";
-    public static final String REPORTES_VENTAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Ventas/Excel";
-    public static final String REPORTES_EMPANADAS_TXT = "C:/DeliciasPam/Reportes/Reportes Empanadas/TXT/";
-    public static final String REPORTES_EMPANADAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Empanadas/Excel/";
-    public static final String REPORTES_RAPIDOS_EXCEL = "G:/Mi unidad/Reportes/Reportes Prod.Rapidos/excel";
+public static final String BASE_PATH = "G:/Mi unidad/";
+public static final String REPORTES_VENTAS_TXT = "C:/DeliciasPam/Reportes/Reportes Ventas/TXT/";
+public static final String REPORTES_VENTAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Ventas/Excel";
+public static final String REPORTES_EMPANADAS_TXT = "C:/DeliciasPam/Reportes/Reportes Empanadas/TXT/";
+public static final String REPORTES_EMPANADAS_EXCEL = "G:/Mi unidad/Reportes/Reportes Empanadas/Excel/";
+public static final String REPORTES_RAPIDOS_TXT = "C:/DeliciasPam/Reportes/Reportes Prod.Rapidos/TXT/";
+public static final String REPORTES_RAPIDOS_EXCEL = "G:/Mi unidad/Reportes/Reportes Prod.Rapidos/excel";
+public static final String SERVER_URL = getConfig("url.servidor");
 
     private static String getConfig(String key) {
         String env = System.getenv(key);
@@ -33,11 +34,11 @@ public class Conexion {
     private static final String POSTGRES_PASSWORD = getConfig("DB_PASSWORD");
 
     private static final String URL
-            = "jdbc:postgresql://" + POSTGRES_HOST + ":" + POSTGRES_PORT + "/" + POSTGRES_DB
-            + "?sslmode=require&connectTimeout=10&socketTimeout=15&prepareThreshold=0";
+            = "jdbc:postgresql://" + POSTGRES_HOST + ":" + POSTGRES_PORT + "/" + POSTGRES_DB;
 
     private static final long CACHE_TTL_MS = 2000;
 
+    private static Connection sharedConn;
     private static final Object LOCK = new Object();
 
     private static ConcurrentHashMap<String, CachedResult> cache;
@@ -45,11 +46,30 @@ public class Conexion {
     static {
         try {
             Class.forName("org.postgresql.Driver");
+
             cache = new ConcurrentHashMap<>();
+
+            sharedConn = crearConexion();
+
             System.out.println("Conexión PostgreSQL inicializada");
+            System.out.println("URL: " + URL);
+            System.out.println("Usuario: " + POSTGRES_USER);
+
         } catch (Exception e) {
-            System.err.println("[Conexion] " + e.getMessage());
+            System.err.println("Error inicializando conexión: " + e.getMessage());
+            e.printStackTrace();
         }
+    }
+
+    private static Connection crearConexion() throws SQLException {
+        Connection conn = DriverManager.getConnection(
+                URL,
+                POSTGRES_USER,
+                POSTGRES_PASSWORD
+        );
+
+        conn.setAutoCommit(true);
+        return conn;
     }
 
     public static Connection conectar() throws SQLException {
@@ -108,8 +128,16 @@ public class Conexion {
     }
 
     public static void shutdown() {
+        try {
+            if (sharedConn != null && !sharedConn.isClosed()) {
+                sharedConn.close();
+            }
+        } catch (SQLException e) {
+            System.err.println("Error cerrando conexión: " + e.getMessage());
+        }
+
         cache.clear();
-        System.out.println("✓ Cache PostgreSQL cerrado");
+        System.out.println("✓ Conexión PostgreSQL cerrada");
     }
 
     private static class CachedResult {
