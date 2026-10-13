@@ -16,7 +16,9 @@ public class ReporteDAO {
                 + "COALESCE(pedidos_app, 0) AS pedidos_app, "
                 + "COALESCE(generado_por, '') AS generado_por, "
                 + "COALESCE(detalle_categorias, '') AS detalle_categorias, "
-                + "COALESCE(gastos, 0) AS gastos "
+                + "COALESCE(gastos, 0) AS gastos, "
+                + "COALESCE(total_debito, 0) AS total_debito, "
+                + "COALESCE(total_credito, 0) AS total_credito "
                 + "FROM reportes "
                 + "WHERE fecha::date >= CURRENT_DATE - INTERVAL '3 months' "
                 + "AND NOT (detalle = 'Cierre manual BD') "
@@ -41,7 +43,9 @@ public class ReporteDAO {
                     String.valueOf(rs.getInt("pedidos_app")),
                     rs.getString("generado_por"),
                     rs.getString("detalle_categorias"),
-                    String.format("$%.0f", rs.getDouble("gastos"))
+                    String.format("$%.0f", rs.getDouble("gastos")),
+                    String.format("$%.0f", rs.getDouble("total_debito")),
+                    String.format("$%.0f", rs.getDouble("total_credito"))
                 });
             }
             rs.close();
@@ -66,7 +70,9 @@ public class ReporteDAO {
                 + "COALESCE(pedidos_app, 0) AS pedidos_app, "
                 + "COALESCE(generado_por, '') AS generado_por, "
                 + "COALESCE(detalle_categorias, '') AS detalle_categorias, "
-                + "COALESCE(gastos, 0) AS gastos "
+                + "COALESCE(gastos, 0) AS gastos, "
+                + "COALESCE(total_debito, 0) AS total_debito, "
+                + "COALESCE(total_credito, 0) AS total_credito "
                 + "FROM reportes "
                 + "WHERE CAST(fecha AS TEXT) LIKE ? "
                 + "ORDER BY id DESC";
@@ -90,7 +96,9 @@ public class ReporteDAO {
                     String.valueOf(rs.getInt("pedidos_app")),
                     rs.getString("generado_por"),
                     rs.getString("detalle_categorias"),
-                    String.valueOf(rs.getDouble("gastos"))
+                    String.valueOf(rs.getDouble("gastos")),
+                    String.format("$%.0f", rs.getDouble("total_debito")),
+                    String.format("$%.0f", rs.getDouble("total_credito"))
                 });
             }
             rs.close();
