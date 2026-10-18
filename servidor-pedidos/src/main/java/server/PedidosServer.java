@@ -118,10 +118,7 @@ public class PedidosServer {
             agregarCorsHeaders(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
                 String query = exchange.getRequestURI().getQuery();
-                String telefono = "";
-                if (query != null && query.contains("telefono=")) {
-                    telefono = query.split("telefono=")[1].split("&")[0];
-                }
+                String telefono = telefonoDesdeQuery(query);
                 List<PedidosDAO.PedidoBD> pedidos = pedidosDAO.cargarPedidosPorTelefono(telefono);
                 StringBuilder json = new StringBuilder("[");
                 for (int i = 0; i < pedidos.size(); i++) {
@@ -149,10 +146,7 @@ public class PedidosServer {
             agregarCorsHeaders(exchange);
             if ("GET".equals(exchange.getRequestMethod())) {
                 String query = exchange.getRequestURI().getQuery();
-                String telefono = "";
-                if (query != null && query.contains("telefono=")) {
-                    telefono = query.split("telefono=")[1].split("&")[0];
-                }
+                String telefono = telefonoDesdeQuery(query);
                 PedidosDAO.PedidoBD p = pedidosDAO.cargarPedidoActivo(telefono);
                 if (p != null) {
                     String json = "{"
@@ -246,8 +240,8 @@ public class PedidosServer {
                         cliente = cliente.replaceAll("[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\\s]", "").trim();
                         if (cliente.length() > 60) cliente = cliente.substring(0, 60);
                         if (cliente.isBlank()) cliente = "Cliente";
-                        telefono = telefono.replaceAll("[^0-9]", "").trim();
-                        if (!telefono.equals("-") && telefono.length() != 9) {
+                        telefono = normalizarTelefono(telefono);
+                        if (telefono.length() != 9) {
                             enviarRespuesta(exchange, 400,
                                     "{\"exito\":false,\"error\":\"Telefono debe tener 9 digitos\"}");
                             return;
@@ -780,8 +774,8 @@ servidor.createContext("/img/", exchange -> {
                 try {
                     String body = readBody(exchange);
                     String codigo = extraerValor(body, "codigo");
-                    String telefono = extraerValor(body, "telefono");
-                    if ("-".equals(codigo) || "-".equals(telefono)) {
+                    String telefono = normalizarTelefono(extraerValor(body, "telefono"));
+                    if ("-".equals(codigo) || telefono.isEmpty()) {
                         enviarRespuesta(exchange, 400, "{\"exito\":false}");
                         return;
                     }
@@ -889,14 +883,14 @@ servidor.createContext("/img/", exchange -> {
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
                     String body = readBody(exchange);
-                    String telefono = sanitizar(extraerValor(body, "telefono"));
+                    String telefono = normalizarTelefono(sanitizar(extraerValor(body, "telefono")));
                     String token = extraerValor(body, "expo_push_token");
                     String plataforma = extraerValor(body, "plataforma");
                     if ("-".equals(plataforma) || plataforma.isBlank()) plataforma = "android";
 
                     System.out.println("[DISPOSITIVOS] registrar: tel=" + telefono + " token=" + (token != null ? token.substring(0, Math.min(30, token.length())) : "null") + " platform=" + plataforma);
 
-                    if ("-".equals(telefono) || "-".equals(token)) {
+                    if (telefono.isEmpty() || "-".equals(token)) {
                         System.out.println("[DISPOSITIVOS] Faltan campos: tel=" + telefono + " token=" + token);
                         enviarRespuesta(exchange, 400, "{\"exito\":false,\"error\":\"Faltan campos\"}");
                         return;
@@ -920,7 +914,7 @@ servidor.createContext("/img/", exchange -> {
             if ("POST".equals(exchange.getRequestMethod())) {
                 try {
                     String body = readBody(exchange);
-                    String telefono = sanitizar(extraerValor(body, "telefono"));
+                    String telefono = normalizarTelefono(sanitizar(extraerValor(body, "telefono")));
                     String token = extraerValor(body, "expo_push_token");
 
                     boolean ok = dispositivoDAO.eliminar(telefono, token);
@@ -1492,6 +1486,25 @@ servidor.createContext("/img/", exchange -> {
         return v.isEmpty() ? "-" : v;
     }
 
+    // ── Teléfono canónico chileno: 9 dígitos nacionales (9XXXXXXXX) ──
+    // Acepta variantes ('+569 1234 5678', '56912345678', '%2B569...') y
+    // devuelve siempre los últimos 9 dígitos.
+    private String normalizarTelefono(String telefono) {
+        if (telefono == null) return "";
+        String digitos = telefono.replaceAll("[^0-9]", "");
+        if (digitos.length() > 9) digitos = digitos.substring(digitos.length() - 9);
+        return digitos;
+    }
+
+    private String telefonoDesdeQuery(String query) {
+        if (query == null || !query.contains("telefono=")) return "";
+        String crudo = query.split("telefono=")[1].split("&")[0];
+        try {
+            crudo = java.net.URLDecoder.decode(crudo, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception ignored) { }
+        return normalizarTelefono(crudo);
+    }
+
     // ── Push Notifications ──────────────────────────────────────────────
     private void enviarPushPedidoListo(int pedidoId) {
         try {
@@ -1501,7 +1514,7 @@ servidor.createContext("/img/", exchange -> {
                 return;
             }
 
-            List<String> tokens = dispositivoDAO.obtenerTokensPorTelefono(pedido.telefono);
+            List<String> tokens = dispositivoDAO.obtenerTokensPorTelefono(normalizarTelefono(pedido.telefono));
             if (tokens.isEmpty()) {
                 System.out.println("[PUSH] No hay dispositivos para: " + pedido.telefono);
                 return;
