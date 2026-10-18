@@ -218,7 +218,7 @@ public class PedidosDAO {
     public PedidoBD cargarPedidoActivo(String telefono) {
         String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
                 + "FROM pedidos "
-                + "WHERE telefono = ? "
+                + "WHERE right(regexp_replace(telefono, '[^0-9]', '', 'g'), 9) = ? "
                 + "AND estado NOT IN ('COBRADO', 'CANCELADO', 'ELIMINADO') "
                 + "ORDER BY fecha_hora DESC LIMIT 1";
         Connection conn = null;
@@ -284,7 +284,7 @@ public class PedidosDAO {
         List<PedidoBD> lista = new ArrayList<>();
         String sql = "SELECT id, numero, cliente, telefono, detalle, total, estado, franja, fecha_hora, origen "
                 + "FROM pedidos "
-                + "WHERE telefono = ? "
+                + "WHERE right(regexp_replace(telefono, '[^0-9]', '', 'g'), 9) = ? "
                 + "AND estado NOT IN ('ELIMINADO') "
                 + "ORDER BY fecha_hora DESC LIMIT 20";
         Connection conn = null;

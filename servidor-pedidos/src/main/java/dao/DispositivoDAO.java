@@ -12,7 +12,7 @@ public class DispositivoDAO {
             conn = Conexion.conectar();
             // 1. Desactivar tokens viejos de este teléfono (Expo Go, etc.)
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE dispositivos SET activo = false WHERE telefono = ? AND expo_push_token != ?")) {
+                    "UPDATE dispositivos SET activo = false WHERE right(regexp_replace(telefono, '[^0-9]', '', 'g'), 9) = ? AND expo_push_token != ?")) {
                 ps.setString(1, telefono);
                 ps.setString(2, expoPushToken);
                 ps.executeUpdate();
@@ -38,7 +38,7 @@ public class DispositivoDAO {
 
     public boolean eliminar(String telefono, String expoPushToken) {
         String sql = "UPDATE dispositivos SET activo = false "
-                + "WHERE telefono = ? AND expo_push_token = ?";
+                + "WHERE right(regexp_replace(telefono, '[^0-9]', '', 'g'), 9) = ? AND expo_push_token = ?";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
@@ -57,8 +57,8 @@ public class DispositivoDAO {
 
     public List<String> obtenerTokensPorTelefono(String telefono) {
         List<String> tokens = new ArrayList<>();
-        String sql = "SELECT expo_push_token FROM dispositivos "
-                + "WHERE telefono = ? AND activo = true";
+        String sql = "SELECT DISTINCT expo_push_token FROM dispositivos "
+                + "WHERE right(regexp_replace(telefono, '[^0-9]', '', 'g'), 9) = ? AND activo = true";
         Connection conn = null;
         try {
             conn = Conexion.conectar();
