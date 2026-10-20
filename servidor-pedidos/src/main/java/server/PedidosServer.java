@@ -182,9 +182,11 @@ public class PedidosServer {
                     String nuevoEstado = extraerValor(body, "estado");
                     boolean ok = pedidosDAO.actualizarEstado(id, nuevoEstado);
 
-                    // Enviar push cuando el pedido está listo para retirar
-                    if (ok && "LISTO".equals(nuevoEstado)) {
-                        enviarPushPedidoListo(id);
+                    // Notificar en cada cambio de estado:
+                    // (a) persiste en notificaciones_app (campana de la app)
+                    // (b) push con avisoId solo al dueño del pedido
+                    if (ok) {
+                        notificarCambioEstado(id, nuevoEstado);
                     }
 
                     enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
@@ -698,7 +700,7 @@ servidor.createContext("/img/", exchange -> {
                             "-".equals(color) ? "#40cee0" : color);
 
                     // 2. Enviar push a todos los dispositivos registrados
-                    new Thread(() -> enviarPushNotificacion(titulo, mensaje)).start();
+                    new Thread(() -> enviarPushNotificacion(id, titulo, mensaje)).start();
 
                     enviarRespuesta(exchange, 200, "{\"exito\":true,\"id\":" + id + "}");
                 } catch (Exception e) {
@@ -709,8 +711,14 @@ servidor.createContext("/img/", exchange -> {
 
             if ("GET".equals(exchange.getRequestMethod())) {
                 try {
-                    // Leer desde Supabase en vez de memoria
-                    List<Map<String, Object>> recent = notificacionDAO.listarRecientes();
+                    // Ventana de 7 días aplicada solo en la vista (WHERE created_at > ?).
+                    // No se borra físicamente: notificaciones_app es historial de negocio
+                    // y este endpoint se consulta en polling cada 15s por cada dispositivo.
+                    // Con teléfono se incluye el estado "leída" por número
+                    String telefono = telefonoDesdeQuery(exchange.getRequestURI().getQuery());
+                    List<Map<String, Object>> recent = telefono.isEmpty()
+                            ? notificacionDAO.listarRecientes()
+                            : notificacionDAO.listarRecientesPara(telefono);
 
                     StringBuilder json = new StringBuilder("[");
                     for (int i = 0; i < recent.size(); i++) {
@@ -724,6 +732,9 @@ servidor.createContext("/img/", exchange -> {
                         json.append("\"fecha\":\"").append(escaparJson((String)n.get("fecha"))).append("\",");
                         json.append("\"hora\":\"").append(escaparJson((String)n.get("hora"))).append("\",");
                         json.append("\"createdAt\":").append(n.get("created_at"));
+                        if (n.get("leida") != null) {
+                            json.append(",\"leida\":").append(Boolean.TRUE.equals(n.get("leida")));
+                        }
                         json.append("}");
                         if (i < recent.size() - 1) json.append(",");
                     }
@@ -737,6 +748,34 @@ servidor.createContext("/img/", exchange -> {
                 } catch (Exception e) {
                     e.printStackTrace();
                     enviarRespuesta(exchange, 500, "{\"error\":\"Error\"}");
+                }
+            }
+        });
+
+        // ── Marcar notificación como leída por teléfono ──────────────────
+        servidor.createContext("/api/notificaciones/leer", exchange -> {
+
+            agregarCorsHeaders(exchange);
+
+            if ("OPTIONS".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if ("POST".equals(exchange.getRequestMethod())) {
+                try {
+                    String body = readBody(exchange);
+                    long id = extraerLong(body, "id");
+                    String telefono = normalizarTelefono(extraerValor(body, "telefono"));
+                    if (id <= 0 || telefono.isEmpty()) {
+                        enviarRespuesta(exchange, 400, "{\"exito\":false}");
+                        return;
+                    }
+                    boolean ok = notificacionDAO.marcarLeida(id, telefono);
+                    enviarRespuesta(exchange, 200, "{\"exito\":" + ok + "}");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    enviarRespuesta(exchange, 500, "{\"exito\":false}");
                 }
             }
         });
@@ -1338,6 +1377,29 @@ servidor.createContext("/img/", exchange -> {
         }
     }
 
+    // Extrae un entero aunque vaya entre comillas ("id":7 o "id":"7")
+    private long extraerLong(String json, String clave) {
+        String patron = "\"" + clave + "\":";
+        int i = json.indexOf(patron);
+        if (i == -1) {
+            return -1;
+        }
+        i += patron.length();
+        int f = json.indexOf(",", i);
+        if (f == -1) {
+            f = json.indexOf("}", i);
+        }
+        if (f == -1) {
+            return -1;
+        }
+        String valor = json.substring(i, f).replaceAll("[^0-9-]", "").trim();
+        try {
+            return Long.parseLong(valor);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
     private String extraerCategoriasDeLosItems(String json) {
         StringBuilder cats = new StringBuilder();
         String patron = "\"categoria\":\"";
@@ -1506,13 +1568,50 @@ servidor.createContext("/img/", exchange -> {
     }
 
     // ── Push Notifications ──────────────────────────────────────────────
-    private void enviarPushPedidoListo(int pedidoId) {
+    // ── Cambio de estado: persiste en notificaciones_app (visible en la
+    // ── campana de la app) y envía push solo al dueño del pedido ────────
+    private void notificarCambioEstado(int pedidoId, String nuevoEstado) {
         try {
+            String titulo;
+            String mensaje;
+            String icono;
+            if ("PENDIENTE".equals(nuevoEstado)) {
+                titulo = "Pedido recibido";
+                mensaje = "Recibimos tu pedido y está en cola. ¡Te avisamos cuando avance!";
+                icono = "clipboard-text-outline";
+            } else if ("PROCESADO".equals(nuevoEstado)) {
+                titulo = "Tu pedido está en preparación";
+                mensaje = "¡Ya lo estamos preparando!";
+                icono = "chef-hat";
+            } else if ("LISTO".equals(nuevoEstado)) {
+                titulo = "¡Tu pedido está listo!";
+                mensaje = "Ya pasás a retirarlo. ¡Gracias! 😊";
+                icono = "bag-checked";
+            } else if ("COBRADO".equals(nuevoEstado)) {
+                titulo = "Pedido entregado/retirado";
+                mensaje = "Gracias por tu compra. ¡Te esperamos de nuevo!";
+                icono = "check-circle";
+            } else if ("CANCELADO".equals(nuevoEstado) || "ELIMINADO".equals(nuevoEstado)) {
+                titulo = "Pedido cancelado";
+                mensaje = "Tu pedido fue cancelado. Si tienes dudas, contáctanos.";
+                icono = "close-circle-outline";
+            } else {
+                // Estado desconocido o ausente: no notificar
+                return;
+            }
+
+            // 1. Resolver al dueño del pedido ANTES de persistir, para no dejar
+            //    notificaciones huérfanas si el pedido no existe.
             PedidosDAO.PedidoBD pedido = pedidosDAO.cargarPedidoActivoPorId(pedidoId);
             if (pedido == null) {
                 System.out.println("[PUSH] No se encontró pedido " + pedidoId);
                 return;
             }
+
+            // 2. Persistir dirigida al dueño (solo él la ve en su campanita).
+            //    telefono con 9 dígitos = alcance individual.
+            long avisoId = notificacionDAO.guardar(
+                    titulo, mensaje, icono, "#40cee0", normalizarTelefono(pedido.telefono));
 
             List<String> tokens = dispositivoDAO.obtenerTokensPorTelefono(normalizarTelefono(pedido.telefono));
             if (tokens.isEmpty()) {
@@ -1520,15 +1619,18 @@ servidor.createContext("/img/", exchange -> {
                 return;
             }
 
-            String titulo = "¡Tu pedido está listo!";
-            String mensaje = "Ya pasás a retirarlo. ¡Gracias! 😊";
             String numeroFormateado = PedidosDAO.formatearNumero(pedido.numero, pedido.origen);
+            Map<String, String> data = new LinkedHashMap<>();
+            data.put("orderId", String.valueOf(pedidoId));
+            data.put("numero", numeroFormateado);
+            if (avisoId > 0) {
+                data.put("avisoId", String.valueOf(avisoId));
+            }
 
             List<String> tokensInvalidos = new ArrayList<>();
             for (String token : tokens) {
                 try {
-                    boolean ok = enviarExpoPush(token, titulo, mensaje,
-                            Map.of("orderId", String.valueOf(pedidoId), "numero", numeroFormateado));
+                    boolean ok = enviarExpoPush(token, titulo, mensaje, data);
                     if (!ok) tokensInvalidos.add(token);
                 } catch (Exception e) {
                     System.err.println("[PUSH] Error a " + token + ": " + e.getMessage());
@@ -1540,9 +1642,10 @@ servidor.createContext("/img/", exchange -> {
                 dispositivoDAO.limpiarTokensInvalidos(tokensInvalidos);
             }
 
-            System.out.println("[PUSH] Enviado a " + tokens.size() + " dispositivos para " + numeroFormateado);
+            System.out.println("[PUSH] Estado " + nuevoEstado + " notificado a " + tokens.size()
+                    + " dispositivos para " + numeroFormateado + " (aviso " + avisoId + ")");
         } catch (Exception e) {
-            System.err.println("[PUSH] Error general: " + e.getMessage());
+            System.err.println("[PUSH] Error notificando cambio de estado: " + e.getMessage());
         }
     }
 
@@ -1593,8 +1696,9 @@ servidor.createContext("/img/", exchange -> {
 
     /**
      * Enviar push notification de anuncio/promoción a todos los dispositivos registrados.
+     * Incluye avisoId en data para que la app use un id estable.
      */
-    private void enviarPushNotificacion(String titulo, String mensaje) {
+    private void enviarPushNotificacion(long avisoId, String titulo, String mensaje) {
         try {
             List<String> tokens = notificacionDAO.obtenerTodosLosTokens();
             if (tokens.isEmpty()) {
@@ -1602,11 +1706,17 @@ servidor.createContext("/img/", exchange -> {
                 return;
             }
 
+            Map<String, String> data = new LinkedHashMap<>();
+            data.put("type", "aviso");
+            data.put("titulo", titulo);
+            if (avisoId > 0) {
+                data.put("avisoId", String.valueOf(avisoId));
+            }
+
             List<String> tokensInvalidos = new ArrayList<>();
             for (String token : tokens) {
                 try {
-                    boolean ok = enviarExpoPush(token, titulo, mensaje,
-                            Map.of("type", "aviso", "titulo", titulo));
+                    boolean ok = enviarExpoPush(token, titulo, mensaje, data);
                     if (!ok) {
                         System.out.println("[PUSH-NOTIF] Push falló para token: " + token.substring(0, Math.min(30, token.length())) + "... (no se limpia aún)");
                     }
