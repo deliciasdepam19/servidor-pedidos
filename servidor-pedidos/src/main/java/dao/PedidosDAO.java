@@ -220,6 +220,7 @@ public class PedidosDAO {
                 + "FROM pedidos "
                 + "WHERE right(regexp_replace(telefono, '[^0-9]', '', 'g'), 9) = ? "
                 + "AND estado NOT IN ('COBRADO', 'CANCELADO', 'ELIMINADO') "
+                + "AND UPPER(origen) = 'APP' "
                 + "ORDER BY fecha_hora DESC LIMIT 1";
         Connection conn = null;
         try {
@@ -286,6 +287,7 @@ public class PedidosDAO {
                 + "FROM pedidos "
                 + "WHERE right(regexp_replace(telefono, '[^0-9]', '', 'g'), 9) = ? "
                 + "AND estado NOT IN ('ELIMINADO') "
+                + "AND UPPER(origen) = 'APP' "
                 + "ORDER BY fecha_hora DESC LIMIT 20";
         Connection conn = null;
         try {
